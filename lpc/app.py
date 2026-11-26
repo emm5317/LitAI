@@ -25,6 +25,10 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
 from .backup import list_backups
+from .chronology import (
+    SIGNIFICANCE, EventError, chronology, delete_event, event_people_ids, format_event_date, issue_tags,
+    parse_event_date, pin_page, save_event,
+)
 from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
 from .ingest import DOC_FIELDS, _fts_query, free_path, search, search_titles, update_document
@@ -138,6 +142,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")
     templates = Jinja2Templates(directory=PACKAGE_DIR / "templates")
     templates.env.filters["highlight"] = highlight
+    templates.env.filters["event_date"] = lambda e: format_event_date(e["event_date"], e["date_precision"])
+    templates.env.filters["pin_page"] = pin_page
     templates.env.globals["version"] = __version__
 
     def db() -> sqlite3.Connection:
@@ -436,6 +442,98 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             db().rollback()
             raise HTTPException(400, f"Could not save the document: {exc}") from exc
         return RedirectResponse(f"/documents/{d['id']}", status_code=303)
+
+    # ------------------------------------------------------------- chronology
+    def event_or_404(event_id: int) -> sqlite3.Row:
+        e = db().execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
+        if e is None:
+            raise HTTPException(404, "Event not found.")
+        return e
+
+    def event_form_choices(matter_id: int) -> dict:
+        return {
+            "parties": matter_parties(db(), matter_id),
+            "documents": db().execute("SELECT id, title, doc_date FROM documents WHERE matter_id = ?"
+                                      " ORDER BY title COLLATE NOCASE", (matter_id,)).fetchall(),
+            "significance": SIGNIFICANCE, "tags": issue_tags(db(), matter_id),
+        }
+
+    async def read_event_form(request: Request) -> tuple[dict, list[int]]:
+        form = await request.form()
+        try:
+            value, precision = parse_event_date(str(form.get("event_date", "")), bool(form.get("approximate")))
+        except EventError as exc:
+            raise HTTPException(400, str(exc)) from None
+        doc = str(form.get("source_document_id", ""))
+        data = {"event_date": value, "date_precision": precision,
+                "description": str(form.get("description", "")).strip(),
+                "significance": str(form.get("significance", "supporting")),
+                "disputed": 1 if form.get("disputed") else 0,
+                "source_document_id": int(doc) if doc.isdigit() else None,
+                "pin": str(form.get("pin", "")).strip(), "issue_tags": str(form.get("issue_tags", "")),
+                "notes": str(form.get("notes", "")).strip()}
+        people = [int(v) for v in form.getlist("people") if str(v).isdigit()]
+        return data, people
+
+    def store_event(matter_id: int, data: dict, people: list[int], event_id: int | None = None) -> int:
+        try:
+            event_id = save_event(db(), matter_id, data, people, event_id)
+            db().commit()
+            return event_id
+        except (EventError, sqlite3.IntegrityError) as exc:
+            db().rollback()
+            raise HTTPException(400, str(exc)) from exc
+
+    @app.get("/matters/{matter_id}/chronology", response_class=HTMLResponse)
+    def chronology_page(request: Request, matter_id: int, person: str = "", issue: str = "", key_only: str = "",
+                        disputed_only: str = "", doc: str = "", pin: str = "", text: str = "", date: str = ""):
+        """The matter's events. doc/pin/text/date prefill the add form ("Add to chronology" links)."""
+        m = matter_or_404(matter_id)
+        prefill = {"pin": pin, "description": text[:2000], "event_date": date}
+        if doc.isdigit():
+            d = db().execute("SELECT id, doc_date FROM documents WHERE id = ? AND matter_id = ?",
+                             (int(doc), matter_id)).fetchone()
+            if d:
+                prefill["source_document_id"] = d["id"]
+                prefill["event_date"] = prefill["event_date"] or (d["doc_date"] or "")
+        filters = {"person": int(person) if person.isdigit() else None, "issue": issue or None,
+                   "key_only": bool(key_only), "disputed_only": bool(disputed_only)}
+        return templates.TemplateResponse(request, "chronology.html", {
+            "m": m, "events": chronology(db(), matter_id, **filters), "filters": filters,
+            "prefill": prefill, "adding": bool(doc or pin or text or date),
+            "total": db().execute("SELECT COUNT(*) FROM events WHERE matter_id = ?", (matter_id,)).fetchone()[0],
+            **event_form_choices(matter_id),
+        })
+
+    @app.post("/matters/{matter_id}/events")
+    async def add_event(request: Request, matter_id: int):
+        matter_or_404(matter_id)
+        data, people = await read_event_form(request)
+        event_id = store_event(matter_id, data, people)
+        code = db().execute("SELECT event_code FROM events WHERE id = ?", (event_id,)).fetchone()[0]
+        return RedirectResponse(f"/matters/{matter_id}/chronology#{code}", status_code=303)
+
+    @app.get("/events/{event_id}/edit", response_class=HTMLResponse)
+    def edit_event(request: Request, event_id: int):
+        e = event_or_404(event_id)
+        return templates.TemplateResponse(request, "event_edit.html", {
+            "e": e, "m": get_matter(db(), e["matter_id"]), "chosen_people": event_people_ids(db(), event_id),
+            **event_form_choices(e["matter_id"]),
+        })
+
+    @app.post("/events/{event_id}/edit")
+    async def save_edited_event(request: Request, event_id: int):
+        e = event_or_404(event_id)
+        data, people = await read_event_form(request)
+        store_event(e["matter_id"], data, people, event_id)
+        return RedirectResponse(f"/matters/{e['matter_id']}/chronology#{e['event_code']}", status_code=303)
+
+    @app.post("/events/{event_id}/delete")
+    def remove_event(event_id: int):
+        e = event_or_404(event_id)
+        delete_event(db(), event_id)
+        db().commit()
+        return RedirectResponse(f"/matters/{e['matter_id']}/chronology", status_code=303)
 
     @app.get("/search", response_class=HTMLResponse)
     def search_view(request: Request, q: str = "", matter_id: int | None = None, doc_type: str = "",

@@ -1,5 +1,18 @@
 {% extends "base.html" %}
-{% block title %}{{ d.title }} · {{ m.short_name }}{% endblock %}
+{% block title %}{{ d.title }} · {{ m.short_name }}<script>
+  // "+ chronology" on a page: carry over any text selected on that page.
+  document.querySelectorAll("a.add-event").forEach(function (link) {
+    link.addEventListener("click", function (e) {
+      var selected = String(window.getSelection() || "").trim();
+      if (!selected) return;
+      e.preventDefault();
+      var url = new URL(link.href);
+      url.searchParams.set("text", selected.slice(0, 2000));
+      window.location = url.toString();
+    });
+  });
+</script>
+{% endblock %}
 {% block content %}
 {% set is_pdf = d.file_path.lower().endswith('.pdf') %}
 <section class="matter-head">
@@ -17,6 +30,7 @@
 
 <div class="doc-actions">
   {% if is_pdf %}<a class="button" href="/documents/{{ d.id }}/file#page={{ page }}" target="_blank">View PDF{% if page > 1 %} at p. {{ page }}{% endif %}</a>{% endif %}
+  <a class="button" href="/matters/{{ m.id }}/chronology?doc={{ d.id }}#add">+ Chronology</a>
   <button hx-post="/documents/{{ d.id }}/open" hx-swap="none">Open in its program</button>
   <button hx-post="/documents/{{ d.id }}/reveal" hx-swap="none">Show in folder</button>
   <span class="muted small">{{ d.file_path }}</span>
@@ -30,7 +44,9 @@
     {% if start > 1 %}<p><a href="/documents/{{ d.id }}?page={{ [start - pages_shown, 1]|max }}&q={{ q|urlencode }}">&larr; Earlier pages</a></p>{% endif %}
     {% for no, text in pages %}
     <section class="page {{ 'current' if no == page }}" id="p-{{ no }}">
-      <h3>Page {{ no }}{% if is_pdf %} <a class="small" href="/documents/{{ d.id }}/file#page={{ no }}" target="_blank">view</a>{% endif %}</h3>
+      <h3>Page {{ no }}{% if is_pdf %} <a class="small" href="/documents/{{ d.id }}/file#page={{ no }}" target="_blank">view</a>{% endif %}
+        <a class="small add-event" href="/matters/{{ m.id }}/chronology?doc={{ d.id }}&pin={{ ('p. ' ~ no)|urlencode }}#add"
+           title="Select text on this page first to copy it into the event">+ chronology</a></h3>
       <div class="page-text">{{ text|highlight }}</div>
     </section>
     {% endfor %}
@@ -70,4 +86,17 @@
     </form>
   </div>
 </section>
+<script>
+  // "+ chronology" on a page: carry over any text selected on that page.
+  document.querySelectorAll("a.add-event").forEach(function (link) {
+    link.addEventListener("click", function (e) {
+      var selected = String(window.getSelection() || "").trim();
+      if (!selected) return;
+      e.preventDefault();
+      var url = new URL(link.href);
+      url.searchParams.set("text", selected.slice(0, 2000));
+      window.location = url.toString();
+    });
+  });
+</script>
 {% endblock %}

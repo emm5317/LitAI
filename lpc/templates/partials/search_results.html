@@ -18,6 +18,7 @@
     <span class="muted">p. {{ h.page_no }}</span>
     <span class="muted small">{{ h.doc_type|replace('_', ' ') }}{% if h.doc_date %} · {{ h.doc_date }}{% endif %}</span>
     {% if h.file_path.lower().endswith('.pdf') %}<a class="small" href="/documents/{{ h.document_id }}/file#page={{ h.page_no }}" target="_blank">view PDF</a>{% endif %}
+    <a class="small" href="/matters/{{ h.matter_id }}/chronology?doc={{ h.document_id }}&pin={{ ('p. ' ~ h.page_no)|urlencode }}#add">+ chronology</a>
   </div>
   <div class="snippet">{{ h.snippet|highlight }}</div>
 </div>

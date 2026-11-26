@@ -1,0 +1,31 @@
+{# Shared by the chronology page (add) and event_edit.html. Expects: v (current values), chosen_people,
+   parties, documents, significance, tags. #}
+<div class="row">
+  <label>Date <input name="event_date" value="{{ v.event_date or '' }}" placeholder="2026-03-03, 2026-03, 2026 or 3/3/2026"></label>
+  <label class="check"><input type="checkbox" name="approximate" value="1" {{ 'checked' if v.date_precision == 'approximate' }}> Approximate</label>
+  <label>Significance
+    <select name="significance">{% for s in significance %}<option value="{{ s }}" {{ 'selected' if s == (v.significance or 'supporting') }}>{{ s|capitalize }}</option>{% endfor %}</select>
+  </label>
+  <label class="check"><input type="checkbox" name="disputed" value="1" {{ 'checked' if v.disputed }}> Disputed</label>
+</div>
+<label>What happened <textarea name="description" rows="3" required>{{ v.description or '' }}</textarea></label>
+{% if parties %}
+<fieldset class="people">
+  <legend class="small">People involved</legend>
+  {% for p in parties %}
+  <label class="check"><input type="checkbox" name="people" value="{{ p.id }}" {{ 'checked' if p.id in chosen_people }}> {{ p.name }} <span class="muted small">{{ p.role|replace('_', ' ') }}</span></label>
+  {% endfor %}
+</fieldset>
+{% endif %}
+<div class="row">
+  <label>Source document
+    <select name="source_document_id">
+      <option value="">(none)</option>
+      {% for d in documents %}<option value="{{ d.id }}" {{ 'selected' if d.id == v.source_document_id }}>{{ d.title }}{% if d.doc_date %} ({{ d.doc_date }}){% endif %}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Pin cite <input name="pin" value="{{ v.pin or '' }}" placeholder="p. 4 or 45:3-12"></label>
+</div>
+<label>Issues (comma-separated) <input name="issue_tags" value="{{ v.issue_tags or '' }}" list="issue-tags" placeholder="retaliation, schedule change"></label>
+<datalist id="issue-tags">{% for t in tags %}<option value="{{ t }}">{% endfor %}</datalist>
+<label>Notes <textarea name="notes" rows="2">{{ v.notes or '' }}</textarea></label>

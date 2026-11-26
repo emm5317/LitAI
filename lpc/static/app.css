@@ -83,3 +83,10 @@ a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--lin
 .search-form .inline-form { margin: 8px 0 0; }
 .search-form label { display: flex; align-items: center; gap: 4px; }
 .title-hits div { padding: 3px 0; }
+.chronology td { font-size: 13px; }
+.chronology tr.sig-key td:nth-child(3) { font-weight: 600; }
+.chronology tr.sig-background td { color: var(--muted); }
+.chronology tr:target { background: #fff8e6; }
+.nowrap { white-space: nowrap; }
+.form fieldset.people { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 10px; }
+.form fieldset.people label.check { flex: 0 0 auto; margin-bottom: 0; }

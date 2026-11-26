@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Chronology · {{ m.short_name }}{% endblock %}
+{% block content %}
+<section class="matter-head">
+  <div>
+    <p class="muted small"><a href="/matters/{{ m.id }}">{{ m.short_name }}</a></p>
+    <h1>Chronology</h1>
+    <p class="muted">{{ m.caption }} · {{ total }} event{{ 's' if total != 1 }}{% if events|length != total %}, {{ events|length }} shown{% endif %}</p>
+  </div>
+</section>
+
+<details class="card" id="add" {{ 'open' if adding }}>
+  <summary><strong>Add an event</strong></summary>
+  <form class="form" method="post" action="/matters/{{ m.id }}/events">
+    {% set v = prefill %}{% set chosen_people = [] %}
+    {% include "partials/event_form.html" %}
+    <button class="primary" type="submit">Add event</button>
+  </form>
+</details>
+
+<div class="card">
+  <form class="inline-form" method="get">
+    <select name="person"><option value="">Everyone</option>{% for p in parties %}<option value="{{ p.id }}" {{ 'selected' if p.id == filters.person }}>{{ p.name }}</option>{% endfor %}</select>
+    <select name="issue"><option value="">All issues</option>{% for t in tags %}<option value="{{ t }}" {{ 'selected' if t == filters.issue }}>{{ t }}</option>{% endfor %}</select>
+    <label class="check small"><input type="checkbox" name="key_only" value="1" {{ 'checked' if filters.key_only }}> Key only</label>
+    <label class="check small"><input type="checkbox" name="disputed_only" value="1" {{ 'checked' if filters.disputed_only }}> Disputed only</label>
+    <button type="submit">Filter</button>
+    {% if filters.person or filters.issue or filters.key_only or filters.disputed_only %}<a href="/matters/{{ m.id }}/chronology">Clear</a>{% endif %}
+  </form>
+  {% if events %}
+  <table class="chronology">
+    <thead><tr><th>Code</th><th>Date</th><th>What happened</th><th>People</th><th>Source</th><th></th></tr></thead>
+    <tbody>
+    {% for e in events %}
+      <tr id="{{ e.event_code }}" class="sig-{{ e.significance }}">
+        <td class="muted">{{ e.event_code }}</td>
+        <td class="nowrap">{{ e|event_date }}</td>
+        <td>{{ e.description }}
+          {% if e.significance == 'key' %}<span class="tag tag-ok">key</span>{% endif %}
+          {% if e.disputed %}<span class="tag tag-warn">disputed</span>{% endif %}
+          {% if e.issue_tags %}<br><span class="muted small">{{ e.issue_tags }}</span>{% endif %}
+          {% if e.notes %}<br><span class="muted small">{{ e.notes }}</span>{% endif %}</td>
+        <td class="small">{{ e.people or '' }}</td>
+        <td class="small">{% if e.source_document_id %}<a href="/documents/{{ e.source_document_id }}{% if e.pin|pin_page %}?page={{ e.pin|pin_page }}#p-{{ e.pin|pin_page }}{% endif %}">{{ e.source_title }}</a>{% if e.pin %}, {{ e.pin }}{% endif %}{% elif e.pin %}{{ e.pin }}{% endif %}</td>
+        <td><a class="small" href="/events/{{ e.id }}/edit">Edit</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">{{ 'No events match these filters.' if total else 'No events yet. Add one above, or use "+ chronology" on a search hit or document page.' }}</p>
+  {% endif %}
+</div>
+{% endblock %}
