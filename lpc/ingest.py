@@ -38,10 +38,13 @@ def extract_pages(path: Path) -> list[str]:
     return []
 
 
-def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, src: Path, *, title: str | None = None,
-                doc_type: str = "other", source: str | None = None, subfolder: str = "10 Source") -> int:
-    """Copy `src` into the matter folder (unless already there), record it, and index its text."""
-    matter_root = Path(matter["folder_path"])
+def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path, src: Path, *,
+                title: str | None = None, doc_type: str = "other", source: str | None = None,
+                subfolder: str = "10 Source") -> int:
+    """Copy `src` into the matter folder (unless already there), record it, and index its text.
+
+    `matter_root` is the matter's folder on disk (see matters.matter_folder).
+    """
     digest = sha256_file(src)
     existing = conn.execute(
         "SELECT id FROM documents WHERE matter_id = ? AND sha256 = ?", (matter["id"], digest)

@@ -79,7 +79,7 @@
     <ul class="changes">
       {% for c in changes %}<li><span class="muted">{{ c.at[:10] }}</span> {{ c.summary }}</li>{% endfor %}
     </ul>
-    <p class="muted small">Folder: {{ m.folder_path }}</p>
+    <p class="muted small">Folder: {{ folder }}</p>
   </div>
 </section>
 {% endblock %}

@@ -146,3 +146,24 @@ def test_unexpected_errors_are_reported(settings, monkeypatch):
     client = TestClient(create_app(settings), base_url="http://127.0.0.1", raise_server_exceptions=False)
     r = client.get("/", headers=HX)
     assert r.status_code == 500 and "disk on fire" in r.text
+
+
+def test_opening_a_matter_is_all_or_nothing(settings, monkeypatch):
+    import sqlite3
+
+    import lpc.app
+
+    client = make_client(settings)
+    _open_matter(client)
+    r = client.post("/matters", data={"short_name": "Doe v. Acme", "caption": "again", "side": "employee"})
+    assert r.status_code == 400 and "already exists" in r.text
+
+    def fail(*args, **kwargs):
+        raise sqlite3.IntegrityError("simulated failure while adding parties")
+
+    monkeypatch.setattr(lpc.app, "add_party_to_matter", fail)
+    r = client.post("/matters", data={"short_name": "Roe v. Acme", "caption": "Roe v. Acme", "side": "employee",
+                                      "client_name": "Rita Roe"})
+    assert r.status_code == 400
+    assert client.app.state.conn.execute(
+        "SELECT COUNT(*) FROM matters WHERE short_name = 'Roe v. Acme'").fetchone()[0] == 0

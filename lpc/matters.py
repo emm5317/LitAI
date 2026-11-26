@@ -24,8 +24,22 @@ def normalize_name(name: str) -> str:
     return " ".join(tokens)
 
 
+class MatterError(ValueError):
+    """A problem the user can fix, such as a duplicate short name. The message says what to do."""
+
+
 def folder_name(short_name: str) -> str:
     return _SAFE_FOLDER.sub("-", short_name).strip(" .")
+
+
+def matter_folder(matter: sqlite3.Row | dict, matters_root: Path) -> Path:
+    """The matter's folder on disk.
+
+    folder_path is stored relative to the matters root so the data survives a move to a new
+    PC or a different OneDrive path. (An older absolute path still works: joining a root with
+    an absolute path gives the absolute path.)
+    """
+    return matters_root / matter["folder_path"]
 
 
 def log_change(conn: sqlite3.Connection, matter_id: int | None, entity: str, entity_id: int | None,
@@ -84,19 +98,35 @@ MATTER_FIELDS = (
 )
 
 
-def create_matter(conn: sqlite3.Connection, data: dict, matters_root: Path) -> int:
-    """Insert a matter, create its folder tree, and log it. `data` keys follow MATTER_FIELDS."""
+def create_matter(conn: sqlite3.Connection, data: dict, matters_root: Path, *, commit: bool = True) -> int:
+    """Insert a matter, create its folder tree, and log it. `data` keys follow MATTER_FIELDS.
+
+    Pass commit=False to add parties in the same transaction and commit once at the end.
+    An existing folder with the same name is adopted, not replaced.
+    """
     values = {k: data[k] for k in MATTER_FIELDS if data.get(k) not in (None, "")}
-    folder = matters_root / folder_name(values["short_name"])
-    values["folder_path"] = str(folder)
+    short_name = values.get("short_name", "")
+    folder = folder_name(short_name)
+    if not any(ch.isalnum() for ch in folder):
+        raise MatterError("The short name needs at least one letter or number.")
+    if conn.execute("SELECT 1 FROM matters WHERE short_name = ?", (short_name,)).fetchone():
+        raise MatterError(f"A matter named \"{short_name}\" already exists. Choose a different short name.")
+    # Windows folder names ignore case, and characters like : / ? become "-", so two
+    # different short names can map to the same folder.
+    other = conn.execute("SELECT short_name FROM matters WHERE lower(folder_path) = lower(?)", (folder,)).fetchone()
+    if other:
+        raise MatterError(f"The folder \"{folder}\" is already used by the matter \"{other['short_name']}\". "
+                          "Choose a different short name.")
+    values["folder_path"] = folder
     cols = ", ".join(values)
     marks = ", ".join("?" for _ in values)
     cur = conn.execute(f"INSERT INTO matters ({cols}) VALUES ({marks})", tuple(values.values()))
     matter_id = cur.lastrowid
     for sub in MATTER_FOLDERS:
-        (folder / sub).mkdir(parents=True, exist_ok=True)
-    log_change(conn, matter_id, "matters", matter_id, f"Opened matter {values['short_name']}")
-    conn.commit()
+        (matters_root / folder / sub).mkdir(parents=True, exist_ok=True)
+    log_change(conn, matter_id, "matters", matter_id, f"Opened matter {short_name}")
+    if commit:
+        conn.commit()
     return matter_id
 
 

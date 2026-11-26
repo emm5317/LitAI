@@ -6,8 +6,8 @@ import pytest
 from lpc.db import migrate
 from lpc.ingest import ingest_file, search
 from lpc.matters import (
-    MATTER_FOLDERS, add_alias, add_party_to_matter, conflicts_search, create_matter, get_matter,
-    list_matters, normalize_name,
+    MATTER_FOLDERS, MatterError, add_alias, add_party_to_matter, conflicts_search, create_matter, get_matter,
+    list_matters, matter_folder, normalize_name,
 )
 
 
@@ -42,8 +42,9 @@ def test_no_billing_tables(conn):
 def test_create_matter_makes_folders_and_logs(conn, settings):
     mid = _matter(conn, settings)
     m = get_matter(conn, mid)
+    assert m["folder_path"] == "Doe v. Acme"                      # stored relative to the matters root
     for sub in MATTER_FOLDERS:
-        assert (Path(m["folder_path"]) / sub).is_dir()
+        assert (settings.matters_dir / "Doe v. Acme" / sub).is_dir()
     assert conn.execute("SELECT COUNT(*) FROM changelog WHERE matter_id = ?", (mid,)).fetchone()[0] == 1
     assert list_matters(conn)[0]["short_name"] == "Doe v. Acme"
 
@@ -71,8 +72,11 @@ def test_ingest_and_search(conn, settings, tmp_path):
     mid = _matter(conn, settings)
     src = tmp_path / "offer_letter.txt"
     src.write_text("The employee will be classified as exempt and paid a weekly salary.", encoding="utf-8")
-    doc_id = ingest_file(conn, get_matter(conn, mid), src, doc_type="contract")
-    assert ingest_file(conn, get_matter(conn, mid), src) == doc_id   # same hash, no duplicate
+    m = get_matter(conn, mid)
+    root = matter_folder(m, settings.matters_dir)
+    doc_id = ingest_file(conn, m, root, src, doc_type="contract")
+    assert ingest_file(conn, m, root, src) == doc_id   # same hash, no duplicate
+    assert (root / "10 Source" / "offer_letter.txt").is_file()
     hits = search(conn, "exempt salary", mid)
     assert hits and hits[0]["title"] == "offer_letter" and hits[0]["page_no"] == 1
     assert "\x02" in hits[0]["snippet"]
@@ -89,6 +93,25 @@ def test_pdf_ingest_pages(conn, settings, tmp_path):
         page.insert_text((72, 72), text)
     pdf.save(pdf_path)
     mid = _matter(conn, settings)
-    ingest_file(conn, get_matter(conn, mid), pdf_path, doc_type="complaint")
+    m = get_matter(conn, mid)
+    ingest_file(conn, m, matter_folder(m, settings.matters_dir), pdf_path, doc_type="complaint")
     hit = search(conn, "Minimum Wage", mid)[0]
     assert hit["page_no"] == 2
+
+
+def test_duplicate_names_and_folder_collisions_are_refused(conn, settings):
+    _matter(conn, settings)
+    with pytest.raises(MatterError, match="already exists"):
+        _matter(conn, settings)
+    with pytest.raises(MatterError, match="already used"):
+        _matter(conn, settings, short_name="DOE V. ACME")           # same folder on Windows
+    _matter(conn, settings, short_name="Roe: v Acme")
+    with pytest.raises(MatterError, match="already used"):
+        _matter(conn, settings, short_name="Roe/ v Acme")           # both become "Roe- v Acme"
+    with pytest.raises(MatterError, match="letter or number"):
+        _matter(conn, settings, short_name="???")
+
+
+def test_old_absolute_folder_paths_still_resolve(tmp_path, settings):
+    legacy = {"folder_path": str(tmp_path / "elsewhere" / "Old Matter")}
+    assert matter_folder(legacy, settings.matters_dir) == tmp_path / "elsewhere" / "Old Matter"

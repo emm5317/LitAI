@@ -24,8 +24,8 @@ from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
 from .ingest import ingest_file, search
 from .matters import (
-    add_party_to_matter, conflicts_search, create_matter, get_matter, list_matters, log_change,
-    matter_parties, record_conflict_check,
+    MatterError, add_party_to_matter, conflicts_search, create_matter, get_matter, list_matters, log_change,
+    matter_folder, matter_parties, record_conflict_check,
 )
 from .rules.engine import SERVICE_METHODS, compute, entries_for, load_rulesets
 
@@ -171,20 +171,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "rules_profile": rules_profile or PROFILE_BY_FORUM.get(forum_type), "case_number": case_number,
             "judge": judge, "ai_permitted": 1 if ai_permitted else 0, "summary": summary, "status": "active",
         }
+        # The matter, its parties and the conflicts-check link are saved together or not at all.
         try:
-            matter_id = create_matter(db(), data, settings.matters_dir)
-        except sqlite3.IntegrityError as exc:
-            raise HTTPException(400, f"Could not open matter: {exc}") from exc
-        if client_name.strip():
-            add_party_to_matter(db(), matter_id, client_name, "client", kind=client_kind)
-        for name in filter(None, (n.strip() for n in adverse_names.splitlines())):
-            add_party_to_matter(db(), matter_id, name, "adverse_party",
-                                kind="person" if side == "employer" else "organization")
-        for name in filter(None, (n.strip() for n in opposing_counsel.splitlines())):
-            add_party_to_matter(db(), matter_id, name, "opposing_counsel")
-        if conflict_check_id.isdigit():
-            db().execute("UPDATE conflict_checks SET matter_id = ? WHERE id = ?", (matter_id, int(conflict_check_id)))
-        db().commit()
+            matter_id = create_matter(db(), data, settings.matters_dir, commit=False)
+            if client_name.strip():
+                add_party_to_matter(db(), matter_id, client_name, "client", kind=client_kind)
+            for name in filter(None, (n.strip() for n in adverse_names.splitlines())):
+                add_party_to_matter(db(), matter_id, name, "adverse_party",
+                                    kind="person" if side == "employer" else "organization")
+            for name in filter(None, (n.strip() for n in opposing_counsel.splitlines())):
+                add_party_to_matter(db(), matter_id, name, "opposing_counsel")
+            if conflict_check_id.isdigit():
+                db().execute("UPDATE conflict_checks SET matter_id = ? WHERE id = ?",
+                             (matter_id, int(conflict_check_id)))
+            db().commit()
+        except Exception as exc:
+            db().rollback()
+            if isinstance(exc, MatterError):
+                raise HTTPException(400, str(exc)) from exc
+            if isinstance(exc, sqlite3.IntegrityError):
+                raise HTTPException(400, f"Could not open the matter: {exc}") from exc
+            raise
         return RedirectResponse(f"/matters/{matter_id}", status_code=303)
 
     @app.get("/matters/{matter_id}", response_class=HTMLResponse)
@@ -194,6 +201,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         profile = m["rules_profile"]
         return templates.TemplateResponse(request, "matter.html", {
             "m": m,
+            "folder": matter_folder(m, settings.matters_dir),
             "parties": matter_parties(c, matter_id),
             "documents": c.execute("SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC",
                                    (matter_id,)).fetchall(),
@@ -233,7 +241,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 path = Path(tmp) / Path(up.filename or "upload").name
                 with path.open("wb") as fh:
                     shutil.copyfileobj(up.file, fh)
-                ingest_file(db(), m, path, doc_type=doc_type, source="internal")
+                ingest_file(db(), m, matter_folder(m, settings.matters_dir), path,
+                            doc_type=doc_type, source="internal")
         docs = db().execute("SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC",
                             (matter_id,)).fetchall()
         return templates.TemplateResponse(request, "partials/documents.html", {"documents": docs})
