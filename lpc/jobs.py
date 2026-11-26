@@ -126,8 +126,14 @@ def run_pending(conn: sqlite3.Connection, matters_root: Path) -> int:
             run_job(conn, job, matters_root)
         except Exception as exc:
             conn.rollback()
+            if type(exc).__name__ == "GatewayBlocked":        # policy said no; nothing left the machine
+                error = f"Not sent to the AI: {exc}"
+            elif type(exc).__name__ == "GatewayRefused":
+                error = f"The AI {str(exc).removeprefix('the model ')}"
+            else:
+                error = f"{type(exc).__name__}: {exc}"
             conn.execute(f"UPDATE jobs SET status = 'failed', error = ?, finished_at = {NOW} WHERE id = ?",
-                         (f"{type(exc).__name__}: {exc}", job["id"]))
+                         (error, job["id"]))
             conn.commit()
         ran += 1
 

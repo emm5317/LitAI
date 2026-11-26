@@ -57,8 +57,16 @@ Turn on BitLocker (or Device Encryption) before putting real client files here.
   `nights OR weekends` and `overtime -exempt` work. Hits open the document at the right page.
 - **Local only**: the app refuses requests that are not addressed to 127.0.0.1/localhost and
   forms submitted from other sites, so a web page in your browser cannot reach your data.
-- **AI gateway** (no UI yet): blocks calls without client consent or on non-ZDR models,
-  sends plain Messages API requests, and logs every call to `ai_calls`.
+- **Chronology**: dated events (partial dates allowed) with people, issues, and a source
+  document and pin cite. "+ chronology" on any search hit or document page fills in the source,
+  page and date (and any text you selected). Filter by person, issue, key or disputed; export
+  what is shown to a Word table, Excel or CSV, or build a per-witness depo outline. Exports are
+  saved in the matter's `20 Work Product` folder and opened in Word or Excel.
+- **AI-suggested events** (matters with client consent only): "Suggest events (AI)" on a
+  document reads it and proposes events, each with a short quote that is checked word for word
+  against the page before you see it. Nothing joins the chronology until you accept it.
+- **AI gateway**: every model call goes through it. It blocks calls without client consent or
+  on non-ZDR models, sends plain Messages API requests, and logs every call to `ai_calls`.
 
 ## Layout
 

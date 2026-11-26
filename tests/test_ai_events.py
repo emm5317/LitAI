@@ -171,3 +171,13 @@ def test_suggest_refused_without_consent_or_text(conn, doc, settings):
     r = client.post(f"/documents/{doc_id}/suggest-events", headers={"HX-Request": "true"})
     assert r.status_code == 400 and "AI is off" in r.text
     assert "disabled title=\"AI is off" in client.get(f"/documents/{doc_id}").text
+
+
+def test_job_without_api_key_says_nothing_was_sent(conn, doc, settings, monkeypatch):
+    from lpc.jobs import enqueue
+
+    mid, doc_id = doc
+    monkeypatch.setattr("lpc.ai.gateway.get_api_key", lambda: None)
+    enqueue(conn, "suggest_events", mid, "AI event suggestions", {"document_id": doc_id})
+    run_pending(conn, settings.matters_dir)
+    assert conn.execute("SELECT error FROM jobs").fetchone()[0] == "Not sent to the AI: no API key configured"

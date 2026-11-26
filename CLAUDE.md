@@ -24,7 +24,10 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | `lpc/matters.py` | matters, party registry, conflicts check, `log_change()` |
 | `lpc/ingest.py` | copy into matter folder, SHA-256 dedupe, email attachments as child docs, FTS5 search |
 | `lpc/extract.py` | file -> page text: PDF (PyMuPDF), DOCX (raw XML), EML (stdlib), MSG (extract-msg) |
-| `lpc/jobs.py` | background jobs table + one worker thread (upload, import folder, rescan) |
+| `lpc/jobs.py` | background jobs table + one worker thread (upload, import folder, rescan, AI suggestions) |
+| `lpc/chronology.py` | events: partial dates, people, issues, source pin; proposed (AI) vs accepted |
+| `lpc/exports.py` | chronology -> Word table / witness outline (python-docx), Excel (openpyxl), CSV |
+| `lpc/ai/events.py` | AI-suggested events: prompt, chunking, verbatim quote check, stored as proposed |
 | `lpc/ai/gateway.py` | the ONLY path to a model (consent check, ZDR model block, audit log) |
 | `lpc/backup.py` | daily `VACUUM INTO` backup, keeps 14; started from `__main__.py` |
 | `lpc/config.py` | data / matters / backup folders (OneDrive default; `LPC_*_DIR` overrides) |
@@ -41,7 +44,8 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
    `verified: true`; only the user does that after checking the source text. New entries start
    `verified: false`. Paraphrase rule text in titles/notes; do not paste AAA/JAMS rule text.
 2. **Nothing auto-confirms.** Computed deadlines are stored `status='proposed'` with the
-   arithmetic in `computation`; only a user action moves them to `confirmed`.
+   arithmetic in `computation`; only a user action moves them to `confirmed`. AI-suggested
+   events are stored `status='proposed'` with their verified quote; only Accept adds them.
 3. **All model calls go through `lpc/ai/gateway.complete()`.** Plain Messages API, inline
    content only. No Files API, batch, or prompt caching (they break zero data retention).
    Respect `matters.ai_permitted`. Keep `ai_calls` logging on every path (ok/blocked/error).
@@ -90,13 +94,16 @@ deadlines and reschedule-with-history (migration 002). M1 done: .docx/.eml/.msg 
 attachments as child documents (003), background jobs (004) for upload / import folder / rescan,
 document page with page text + "view PDF at page", phrase/OR/-word search with filters and
 title matches, editable document details. Deferred: OCR (needs Tesseract on Windows).
-Owner's priorities, in order: M2 chronology + depo prep (events UI,
-"add to chronology" from a hit, .docx export via python-docx, optional AI-proposed events) ->
+M2 items 1-4 done: chronology page, "+ chronology" from hits/pages, exports saved to
+`20 Work Product` and opened, AI-suggested events (migration 005; quotes verified against page
+text; `proposed` until accepted; no server-side fallbacks under ZDR). M2 still open, waiting on
+samples from the owner: Key Events workbook import (openpyxl approved) and transcript page:line
+parsing. Then ->
 M3 discovery tracking (sets, auto-proposed response deadlines from ruleset data, limits) ->
 M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
 Later: ECF/NEF parser; email via **Outlook/Graph first** (the practice uses Microsoft 365),
 Gmail after; research + cite checks; drafting; settlement analytics.
-Approved dependencies for M1/M2: `extract-msg`, `python-docx`.
+Approved dependencies: `extract-msg`, `python-docx`, `openpyxl`.
 
 Open items to verify with the user, not guess: Illinois holiday list (205 ILCS 630/17),
 Ill. S. Ct. R. 12 mail-service days, 7th Cir. R. 10(c), FRAP 40(d)(1) subsection, N.D. Ill.
