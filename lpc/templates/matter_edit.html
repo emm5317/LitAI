@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ m.short_name }} · Law Practice Console{% endblock %}
+{% macro choose(name, options, current, blank=false) %}
+  <select name="{{ name }}">
+    {% if blank %}<option value="">(none)</option>{% endif %}
+    {% for o in options %}<option value="{{ o }}" {{ 'selected' if o == current }}>{{ o|replace('_', ' ')|capitalize }}</option>{% endfor %}
+  </select>
+{% endmacro %}
+{% block content %}
+<form class="card form" method="post" action="/matters/{{ m.id }}/edit">
+  <h2>Edit {{ m.short_name }}</h2>
+  <p class="muted small">The short name stays fixed because it names the matter folder. Every change is logged.</p>
+
+  <fieldset>
+    <legend>Status</legend>
+    <div class="row">
+      <label>Status {{ choose("status", statuses, m.status) }}</label>
+      <label>Phase {{ choose("phase", phases, m.phase, blank=true) }}</label>
+      <label>We represent the
+        <select name="side">
+          <option value="employer" {{ 'selected' if m.side == 'employer' }}>Employer</option>
+          <option value="employee" {{ 'selected' if m.side == 'employee' }}>Employee</option>
+        </select>
+      </label>
+      <label>Matter type {{ choose("matter_type", matter_types, m.matter_type) }}</label>
+    </div>
+    <label class="check"><input type="checkbox" name="ai_permitted" value="1" {{ 'checked' if m.ai_permitted }}>
+      Client has consented to AI-assisted work on this matter</label>
+  </fieldset>
+
+  <fieldset>
+    <legend>Case</legend>
+    <label>Caption <input name="caption" value="{{ m.caption }}" required></label>
+    <div class="row">
+      <label>Forum {{ choose("forum_type", forum_types, m.forum_type) }}</label>
+      <label>Deadline rules
+        <select name="rules_profile">
+          <option value="">(none)</option>
+          {% for p in profiles.values() %}<option value="{{ p.id }}" {{ 'selected' if p.id == m.rules_profile }}>{{ p.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Court or forum name <input name="forum_name" value="{{ m.forum_name or '' }}"></label>
+      <label>Case number <input name="case_number" value="{{ m.case_number or '' }}"></label>
+    </div>
+    <div class="row">
+      <label>Judge <input name="judge" value="{{ m.judge or '' }}"></label>
+      <label>Magistrate judge <input name="magistrate_judge" value="{{ m.magistrate_judge or '' }}"></label>
+      <label>Arbitrator <input name="arbitrator" value="{{ m.arbitrator or '' }}"></label>
+    </div>
+    <div class="row">
+      <label>Complaint or demand filed <input type="date" name="commenced_on" value="{{ m.commenced_on or '' }}"></label>
+      <label>Service date <input type="date" name="served_on" value="{{ m.served_on or '' }}"></label>
+      <label>Claim categories <input name="claim_categories" value="{{ m.claim_categories or '' }}" placeholder="wage-hour, retaliation"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Notes</legend>
+    <label>Summary <textarea name="summary" rows="3">{{ m.summary or '' }}</textarea></label>
+    <label>Notes <textarea name="notes" rows="4">{{ m.notes or '' }}</textarea></label>
+  </fieldset>
+
+  <button class="primary" type="submit">Save</button> &nbsp; <a href="/matters/{{ m.id }}">Cancel</a>
+</form>
+{% endblock %}

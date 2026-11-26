@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import difflib
 import json
 import re
@@ -128,6 +129,66 @@ def create_matter(conn: sqlite3.Connection, data: dict, matters_root: Path, *, c
     if commit:
         conn.commit()
     return matter_id
+
+
+# Choices for the edit form; they mirror the CHECK constraints in 001_matter_schema.sql.
+MATTER_TYPES = ("single_plaintiff", "class", "collective", "hybrid_class_collective", "individual_arbitration",
+                "mass_arbitration", "pre_suit", "agency_charge", "counseling", "appeal")
+FORUM_TYPES = ("federal_district", "federal_appeals", "state_trial", "state_appeals", "aaa", "jams",
+               "other_arbitration", "agency", "pre_suit")
+STATUSES = ("intake", "active", "stayed", "settled_pending", "appeal", "closed", "declined")
+PHASES = ("pre_suit", "pleadings", "discovery", "dispositive_motions", "class_cert", "mediation", "trial",
+          "post_trial", "appeal", "settlement_admin")
+
+# Everything but short_name, which names the matter folder and stays fixed once opened.
+EDITABLE_FIELDS = (
+    "caption", "side", "matter_type", "claim_categories", "forum_type", "forum_name", "rules_profile",
+    "case_number", "judge", "magistrate_judge", "arbitrator", "status", "phase", "ai_permitted",
+    "commenced_on", "served_on", "summary", "notes",
+)
+_LONG_TEXT = {"summary", "notes"}
+
+
+def _describe_change(field: str, old, new) -> str:
+    if field == "ai_permitted":
+        return "AI consent turned " + ("on" if new else "off")
+    label = field.replace("_", " ")
+    if field in _LONG_TEXT:
+        return f"Updated {label}"
+    show = lambda v: str(v).replace("_", " ") if v not in (None, "") else "(blank)"  # noqa: E731
+    return f"Changed {label}: {show(old)} -> {show(new)}"
+
+
+def update_matter(conn: sqlite3.Connection, matter_id: int, data: dict) -> list[str]:
+    """Save edited fields, log each change, and return the change summaries (empty if nothing changed).
+
+    Blank values are stored as NULL. Closing a matter stamps closed_on; reopening clears it.
+    Does not commit.
+    """
+    current = get_matter(conn, matter_id)
+    if current is None:
+        raise MatterError("Matter not found.")
+    changes: dict = {}
+    for field in EDITABLE_FIELDS:
+        if field not in data:
+            continue
+        new = None if data[field] in ("", None) else data[field]
+        if new != current[field]:
+            changes[field] = new
+    if not changes:
+        return []
+    summaries = [_describe_change(f, current[f], v) for f, v in changes.items()]
+    if "status" in changes:
+        if changes["status"] == "closed" and not current["closed_on"]:
+            changes["closed_on"] = dt.date.today().isoformat()
+        elif changes["status"] != "closed":
+            changes["closed_on"] = None
+    assignments = ", ".join(f"{field} = ?" for field in changes)
+    conn.execute(f"UPDATE matters SET {assignments}, updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')"
+                 " WHERE id = ?", (*changes.values(), matter_id))
+    for summary in summaries:
+        log_change(conn, matter_id, "matters", matter_id, summary)
+    return summaries
 
 
 def get_matter(conn: sqlite3.Connection, matter_id: int) -> sqlite3.Row | None:

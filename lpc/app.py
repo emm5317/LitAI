@@ -24,8 +24,9 @@ from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
 from .ingest import ingest_file, search
 from .matters import (
-    MatterError, add_party_to_matter, conflicts_search, create_matter, get_matter, list_matters, log_change,
-    matter_folder, matter_parties, record_conflict_check,
+    EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
+    conflicts_search, create_matter, get_matter, list_matters, log_change, matter_folder, matter_parties,
+    record_conflict_check, update_matter,
 )
 from .rules.engine import SERVICE_METHODS, compute, entries_for, load_rulesets
 
@@ -213,6 +214,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "changes": c.execute("SELECT * FROM changelog WHERE matter_id = ? ORDER BY id DESC LIMIT 15",
                                  (matter_id,)).fetchall(),
         })
+
+    @app.get("/matters/{matter_id}/edit", response_class=HTMLResponse)
+    def edit_matter(request: Request, matter_id: int):
+        return templates.TemplateResponse(request, "matter_edit.html", {
+            "m": matter_or_404(matter_id), "profiles": load_rulesets(), "statuses": STATUSES, "phases": PHASES,
+            "matter_types": MATTER_TYPES, "forum_types": FORUM_TYPES,
+        })
+
+    @app.post("/matters/{matter_id}/edit")
+    async def save_matter(request: Request, matter_id: int):
+        matter_or_404(matter_id)
+        form = await request.form()
+        data = {field: str(form.get(field, "")).strip() for field in EDITABLE_FIELDS}
+        data["ai_permitted"] = 1 if form.get("ai_permitted") else 0      # unticked boxes are not sent
+        if data["rules_profile"] and data["rules_profile"] not in load_rulesets():
+            raise HTTPException(400, f"Unknown deadline rules: {data['rules_profile']}.")
+        for field in ("commenced_on", "served_on"):
+            try:
+                if data[field]:
+                    dt.date.fromisoformat(data[field])
+            except ValueError:
+                raise HTTPException(400, f"Enter {field.replace('_', ' ')} as a date (YYYY-MM-DD).") from None
+        try:
+            update_matter(db(), matter_id, data)
+            db().commit()
+        except sqlite3.IntegrityError as exc:
+            db().rollback()
+            raise HTTPException(400, f"Could not save the matter: {exc}") from exc
+        return RedirectResponse(f"/matters/{matter_id}", status_code=303)
 
     # --------------------------------------------------------------- partials
     @app.post("/conflicts/check", response_class=HTMLResponse)

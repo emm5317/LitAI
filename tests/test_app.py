@@ -167,3 +167,44 @@ def test_opening_a_matter_is_all_or_nothing(settings, monkeypatch):
     assert r.status_code == 400
     assert client.app.state.conn.execute(
         "SELECT COUNT(*) FROM matters WHERE short_name = 'Roe v. Acme'").fetchone()[0] == 0
+
+
+def test_edit_matter_saves_and_logs_changes(settings):
+    from lpc.ai.gateway import AIRequest, check_policy
+
+    client = make_client(settings)
+    mid = _open_matter(client, case_number="1:26-cv-01234")
+    assert "Edit Doe v. Acme" in client.get(f"/matters/{mid}/edit").text
+    form = {"caption": "Jane Doe v. Acme Logistics, Inc.", "side": "employer", "matter_type": "single_plaintiff",
+            "forum_type": "federal_district", "rules_profile": "ndil", "case_number": "1:26-cv-01234",
+            "status": "active", "phase": "discovery", "judge": "Hon. A. Judge", "ai_permitted": "1"}
+    r = client.post(f"/matters/{mid}/edit", data=form, follow_redirects=False)
+    assert r.status_code == 303
+    page = client.get(f"/matters/{mid}").text
+    assert "Changed phase: (blank) -&gt; discovery" in page and "AI consent turned on" in page
+    conn = client.app.state.conn
+    assert check_policy(conn, AIRequest(purpose="qa", prompt="x", matter_id=int(mid))) is None
+
+    logged = conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0]
+    client.post(f"/matters/{mid}/edit", data=form)                       # nothing changed
+    assert conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0] == logged
+
+    client.post(f"/matters/{mid}/edit", data={**form, "status": "closed"})
+    assert conn.execute("SELECT closed_on FROM matters WHERE id = ?", (mid,)).fetchone()[0]
+    client.post(f"/matters/{mid}/edit", data={**form, "status": "active"})
+    assert conn.execute("SELECT closed_on FROM matters WHERE id = ?", (mid,)).fetchone()[0] is None
+
+
+def test_edit_matter_rejects_bad_values(settings):
+    client = make_client(settings)
+    mid = _open_matter(client)
+    base = {"caption": "C", "side": "employer", "matter_type": "single_plaintiff",
+            "forum_type": "federal_district", "status": "active"}
+    r = client.post(f"/matters/{mid}/edit", data={**base, "phase": "vibes"})
+    assert r.status_code == 400 and "Could not save" in r.text
+    r = client.post(f"/matters/{mid}/edit", data={**base, "served_on": "last Tuesday"})
+    assert r.status_code == 400 and "served on" in r.text
+    r = client.post(f"/matters/{mid}/edit", data={**base, "caption": ""})
+    assert r.status_code == 400
+    r = client.post(f"/matters/{mid}/edit", data={**base, "rules_profile": "mars"})
+    assert r.status_code == 400 and "Unknown deadline rules" in r.text
