@@ -1,0 +1,253 @@
+# Federal Rules of Civil Procedure - baseline for every federal district court.
+# Periods are paraphrased as data; check each entry against the rule text in
+# rules/sources/ and set verified: true once it matches. Court orders and local
+# rules can change any of these.
+id: frcp
+name: Federal Rules of Civil Procedure
+jurisdiction: federal
+counting: frcp6a
+holidays:
+  all: [federal]        # district profiles add the forum state's holidays for forward periods
+service:
+  # FRCP 6(d): 3 days added after the period would otherwise expire under 6(a), for
+  # service by mail, leaving with the clerk, or other consented means. Not electronic.
+  add_days: {mail: 3, leave_with_clerk: 3, other_consented: 3, electronic: 0, hand: 0}
+sources: [frcp]
+verified: false
+entries:
+  # --- Pleadings --------------------------------------------------------------
+  - id: frcp.serve_complaint
+    title: Serve summons and complaint
+    cite: Fed. R. Civ. P. 4(m)
+    trigger: complaint filed
+    period: {days: 90}
+  - id: frcp.answer
+    title: Answer or Rule 12 motion due
+    cite: Fed. R. Civ. P. 12(a)(1)(A)(i)
+    trigger: service of summons and complaint
+    period: {days: 21}
+  - id: frcp.answer_waiver
+    title: Answer due after timely waiver of service
+    cite: Fed. R. Civ. P. 12(a)(1)(A)(ii)
+    trigger: waiver request sent
+    period: {days: 60}
+    notes: 90 days if the request was sent to a defendant outside any U.S. judicial district.
+  - id: frcp.answer_united_states
+    title: Answer due (United States, agency, or officer)
+    cite: Fed. R. Civ. P. 12(a)(2)
+    trigger: service on the United States attorney
+    period: {days: 60}
+  - id: frcp.answer_counterclaim
+    title: Answer to counterclaim or crossclaim
+    cite: Fed. R. Civ. P. 12(a)(1)(B)
+    trigger: service of pleading stating the counterclaim or crossclaim
+    period: {days: 21}
+    service_applies: true
+  - id: frcp.answer_after_motion
+    title: Responsive pleading after Rule 12 motion is denied or postponed
+    cite: Fed. R. Civ. P. 12(a)(4)(A)
+    trigger: notice of the court's action
+    period: {days: 14}
+    service_applies: true
+  - id: frcp.motion_to_strike
+    title: Motion to strike (when no response is allowed)
+    cite: Fed. R. Civ. P. 12(f)(2)
+    trigger: service of the pleading
+    period: {days: 21}
+    service_applies: true
+  - id: frcp.amend_as_of_course
+    title: Amend once as a matter of course
+    cite: Fed. R. Civ. P. 15(a)(1)
+    trigger: service of responsive pleading or Rule 12(b), (e), or (f) motion
+    period: {days: 21}
+    service_applies: true
+    notes: Also 21 days after serving the pleading itself; the earlier window may control.
+  - id: frcp.respond_amended
+    title: Response to amended pleading
+    cite: Fed. R. Civ. P. 15(a)(3)
+    trigger: service of amended pleading
+    period: {days: 14}
+    service_applies: true
+    notes: Or the time remaining to respond to the original pleading, whichever is later.
+  - id: frcp.jury_demand
+    title: Jury demand
+    cite: Fed. R. Civ. P. 38(b)(1)
+    trigger: service of the last pleading directed to the issue
+    period: {days: 14}
+    service_applies: true
+  # --- Removed cases (the latest of the three controls) --------------------------
+  - id: frcp.removed_answer_pleading
+    title: Answer after removal - from receipt of initial pleading
+    cite: Fed. R. Civ. P. 81(c)(2)(A)
+    trigger: receipt of the initial pleading
+    period: {days: 21}
+    group: 81(c)(2) - use the latest of the three
+  - id: frcp.removed_answer_summons
+    title: Answer after removal - from service of summons
+    cite: Fed. R. Civ. P. 81(c)(2)(B)
+    trigger: service of the summons
+    period: {days: 21}
+    group: 81(c)(2) - use the latest of the three
+  - id: frcp.removed_answer_notice
+    title: Answer after removal - from notice of removal
+    cite: Fed. R. Civ. P. 81(c)(2)(C)
+    trigger: notice of removal filed
+    period: {days: 7}
+    group: 81(c)(2) - use the latest of the three
+  # --- Discovery ------------------------------------------------------------------
+  - id: frcp.rule26f_conference
+    title: Rule 26(f) conference
+    cite: Fed. R. Civ. P. 26(f)(1)
+    trigger: scheduling conference (or date the scheduling order is due)
+    direction: before
+    period: {days: 21}
+    notes: As soon as practicable, and in any event at least 21 days before.
+  - id: frcp.rule26f_report
+    title: Rule 26(f) written report
+    cite: Fed. R. Civ. P. 26(f)(2)
+    trigger: Rule 26(f) conference
+    period: {days: 14}
+  - id: frcp.initial_disclosures
+    title: Initial disclosures
+    cite: Fed. R. Civ. P. 26(a)(1)(C)
+    trigger: Rule 26(f) conference
+    period: {days: 14}
+  - id: frcp.expert_disclosures
+    title: Expert disclosures (absent stipulation or order)
+    cite: Fed. R. Civ. P. 26(a)(2)(D)(i)
+    trigger: trial date (or date set for trial readiness)
+    direction: before
+    period: {days: 90}
+  - id: frcp.rebuttal_expert
+    title: Rebuttal expert disclosure
+    cite: Fed. R. Civ. P. 26(a)(2)(D)(ii)
+    trigger: other party's expert disclosure
+    period: {days: 30}
+    service_applies: true
+  - id: frcp.pretrial_disclosures
+    title: Pretrial disclosures
+    cite: Fed. R. Civ. P. 26(a)(3)(B)
+    trigger: trial date
+    direction: before
+    period: {days: 30}
+  - id: frcp.pretrial_objections
+    title: Objections to pretrial disclosures
+    cite: Fed. R. Civ. P. 26(a)(3)(B)
+    trigger: pretrial disclosures made
+    period: {days: 14}
+    service_applies: true
+  - id: frcp.interrogatory_responses
+    title: Answers and objections to interrogatories
+    cite: Fed. R. Civ. P. 33(b)(2)
+    trigger: service of interrogatories
+    period: {days: 30}
+    service_applies: true
+  - id: frcp.rfp_responses
+    title: Responses to requests for production
+    cite: Fed. R. Civ. P. 34(b)(2)(A)
+    trigger: service of requests
+    period: {days: 30}
+    service_applies: true
+  - id: frcp.rfp_responses_early
+    title: Responses to early Rule 34 requests
+    cite: Fed. R. Civ. P. 34(b)(2)(A); 26(d)(2)
+    trigger: Rule 26(f) conference (early requests are treated as served then)
+    period: {days: 30}
+  - id: frcp.rfa_responses
+    title: Responses to requests for admission (matters deemed admitted if late)
+    cite: Fed. R. Civ. P. 36(a)(3)
+    trigger: service of requests
+    period: {days: 30}
+    service_applies: true
+  - id: frcp.subpoena_objections
+    title: Written objections to subpoena for documents or inspection
+    cite: Fed. R. Civ. P. 45(d)(2)(B)
+    trigger: service of subpoena
+    period: {days: 14}
+    notes: Due by the earlier of the compliance date or 14 days after service.
+  # --- Motions and hearings ---------------------------------------------------------
+  - id: frcp.motion_notice
+    title: Serve written motion and notice of hearing
+    cite: Fed. R. Civ. P. 6(c)(1)
+    trigger: hearing date
+    direction: before
+    period: {days: 14}
+    notes: Local rules and judges' standing orders usually control briefing instead.
+  - id: frcp.opposing_affidavit
+    title: Serve opposing affidavit
+    cite: Fed. R. Civ. P. 6(c)(2)
+    trigger: hearing date
+    direction: before
+    period: {days: 7}
+  - id: frcp.summary_judgment_cutoff
+    title: Last day to move for summary judgment (absent local rule or order)
+    cite: Fed. R. Civ. P. 56(b)
+    trigger: close of all discovery
+    period: {days: 30}
+  - id: frcp.magistrate_objections
+    title: Objections to magistrate judge's order or recommendation
+    cite: Fed. R. Civ. P. 72(a), 72(b)(2)
+    trigger: service of the order or recommendation
+    period: {days: 14}
+    service_applies: true
+  - id: frcp.magistrate_objection_response
+    title: Response to objections to recommendation
+    cite: Fed. R. Civ. P. 72(b)(2)
+    trigger: service of the objections
+    period: {days: 14}
+    service_applies: true
+  - id: frcp.offer_of_judgment
+    title: Last day to serve offer of judgment
+    cite: Fed. R. Civ. P. 68(a)
+    trigger: trial date
+    direction: before
+    period: {days: 14}
+  - id: frcp.accept_offer
+    title: Accept offer of judgment
+    cite: Fed. R. Civ. P. 68(a)
+    trigger: service of the offer
+    period: {days: 14}
+    service_applies: true
+  # --- Post-judgment ----------------------------------------------------------------
+  - id: frcp.renewed_jmol
+    title: Renewed motion for judgment as a matter of law
+    cite: Fed. R. Civ. P. 50(b)
+    trigger: entry of judgment
+    period: {days: 28}
+  - id: frcp.amend_findings
+    title: Motion to amend findings
+    cite: Fed. R. Civ. P. 52(b)
+    trigger: entry of judgment
+    period: {days: 28}
+  - id: frcp.new_trial
+    title: Motion for new trial
+    cite: Fed. R. Civ. P. 59(b)
+    trigger: entry of judgment
+    period: {days: 28}
+  - id: frcp.alter_amend
+    title: Motion to alter or amend judgment
+    cite: Fed. R. Civ. P. 59(e)
+    trigger: entry of judgment
+    period: {days: 28}
+  - id: frcp.fees_motion
+    title: Motion for attorney's fees (absent statute or order)
+    cite: Fed. R. Civ. P. 54(d)(2)(B)(i)
+    trigger: entry of judgment
+    period: {days: 14}
+  - id: frcp.review_costs
+    title: Motion to review clerk's taxation of costs
+    cite: Fed. R. Civ. P. 54(d)(1)
+    trigger: clerk's action taxing costs
+    period: {days: 7}
+  - id: frcp.rule60_one_year
+    title: Outside limit for Rule 60(b)(1)-(3) motion
+    cite: Fed. R. Civ. P. 60(c)(1)
+    trigger: entry of judgment or order
+    period: {months: 12}
+    notes: Must also be made within a reasonable time; the one-year limit is an outer bound.
+  - id: frcp.automatic_stay_ends
+    title: Automatic stay of execution ends
+    cite: Fed. R. Civ. P. 62(a)
+    trigger: entry of judgment
+    period: {days: 30}
+    hard: false

@@ -1,0 +1,27 @@
+# U.S. District Court for the Northern District of Illinois.
+# Inherits every FRCP and federal-statute entry; adds Illinois holidays for periods
+# counted forward (FRCP 6(a)(6)(C)).
+#
+# Most N.D. Ill. briefing deadlines are set by the assigned judge (standing orders and
+# minute entries), not by the Local Rules. Enter those as court-order deadlines.
+id: ndil
+name: N.D. Illinois (Local Rules + FRCP)
+jurisdiction: federal
+counting: frcp6a
+holidays:
+  all: [federal]
+  forward_only: [illinois]
+base: [frcp, federal_statutes]
+sources: [ndil_local_rules]
+verified: false
+notes: >
+  Check the assigned judge's standing orders for briefing schedules, page limits and
+  courtesy-copy rules. LR 56.1 caps statements of fact (verify current limits) and sets
+  the form of responses; response deadlines come from the court's schedule.
+entries:
+  - id: ndil.affiliates_notice
+    title: Notification of affiliates (with first appearance or filing)
+    cite: N.D. Ill. LR 3.2
+    trigger: party's first appearance or filing
+    period: {days: 0}
+    notes: Verify current text; FRCP 7.1 disclosure is due at the same time.

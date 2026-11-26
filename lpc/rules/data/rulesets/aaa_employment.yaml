@@ -1,0 +1,80 @@
+# AAA Employment/Workplace Arbitration Rules, amended and effective May 1, 2025.
+# Periods are calendar days. The rules do not say whether a weekend or holiday end
+# date rolls, so the engine warns instead of rolling. Arbitrator and AAA orders control.
+id: aaa_employment
+name: AAA Employment/Workplace Arbitration Rules (eff. May 1, 2025)
+jurisdiction: arbitration
+counting: calendar
+holidays:
+  all: [federal]
+base: [federal_statutes]
+sources: [aaa_employment_rules]
+verified: false
+entries:
+  - id: aaa.answer
+    title: Respondent's answer (and any counterclaim)
+    cite: AAA Employment/Workplace R-5(a)-(b)
+    trigger: AAA's request for an answer
+    period: {days: 14}
+    notes: If no answer is filed, the case proceeds (R-5(c)).
+  - id: aaa.answer_counterclaim
+    title: Claimant's answer to counterclaim
+    cite: AAA Employment/Workplace R-5(b)
+    trigger: AAA's notice of the counterclaim
+    period: {days: 14}
+  - id: aaa.answer_new_claim
+    title: Answer to new or changed claim
+    cite: AAA Employment/Workplace R-6(a)
+    trigger: AAA's notice of receipt of the new or changed claim
+    period: {days: 14}
+  - id: aaa.jurisdiction_objection
+    title: Objection to arbitrability or jurisdiction
+    cite: AAA Employment/Workplace R-7(c)
+    trigger: AAA's request for an answer
+    period: {days: 14}
+    notes: Due by the answer deadline for the claim or counterclaim objected to.
+  - id: aaa.judicial_intervention
+    title: Seek court intervention to get the AAA's 90-day suspension
+    cite: AAA Employment/Workplace R-2
+    trigger: AAA's commencement of administration
+    period: {days: 30}
+  - id: aaa.arbitrator_list
+    title: Return arbitrator strike-and-rank list
+    cite: AAA Employment/Workplace R-13(b)(ii)
+    trigger: transmittal of the list
+    period: {days: 14}
+  - id: aaa.hearing_notice
+    title: Notice of hearing (absent agreement)
+    cite: AAA Employment/Workplace R-23
+    trigger: hearing date
+    direction: before
+    period: {days: 10}
+    hard: false
+  - id: aaa.representation_notice
+    title: Notice of representative
+    cite: AAA Employment/Workplace R-25(a)
+    trigger: hearing date
+    direction: before
+    period: {days: 7}
+  - id: aaa.transcript_notice
+    title: Notice of stenographic record arrangements
+    cite: AAA Employment/Workplace R-27(a)
+    trigger: hearing date
+    direction: before
+    period: {days: 7}
+  - id: aaa.award_due
+    title: Award due from arbitrator
+    cite: AAA Employment/Workplace R-44
+    trigger: close of hearing
+    period: {days: 30}
+    hard: false
+  - id: aaa.modify_award
+    title: Request to modify or correct award
+    cite: AAA Employment/Workplace R-49(a)
+    trigger: transmittal of the award
+    period: {days: 20}
+  - id: aaa.modify_award_response
+    title: Response to request to modify or correct award
+    cite: AAA Employment/Workplace R-49(b)
+    trigger: transmittal of the request
+    period: {days: 10}

@@ -1,0 +1,86 @@
+# Illinois state courts: Supreme Court Rules and the Code of Civil Procedure.
+id: illinois
+name: Illinois Supreme Court Rules and Code of Civil Procedure
+jurisdiction: illinois
+counting: illinois          # 5 ILCS 70/1.11
+holidays:
+  all: [federal, illinois]
+service:
+  # Ill. S. Ct. R. 12: service by mail is complete 4 days after mailing; e-mail and
+  # e-filing service are complete on transmission. Verify current text of Rule 12.
+  completes_after: {mail: 4, electronic: 0, hand: 0}
+sources: [il_supreme_court_rules, ilcs]
+verified: false
+entries:
+  - id: il.appearance_answer
+    title: Appearance and answer or motion
+    cite: Ill. S. Ct. R. 181(a)
+    trigger: service of summons (exclusive of the day of service)
+    period: {days: 30}
+  - id: il.reply
+    title: Reply to answer
+    cite: Ill. S. Ct. R. 182(a)
+    trigger: last day allowed for filing the answer
+    period: {days: 21}
+  - id: il.case_management_conference
+    title: Initial case management conference held
+    cite: Ill. S. Ct. R. 218(a)
+    trigger: complaint filed
+    period: {days: 182}
+    hard: false
+  - id: il.interrogatory_answers
+    title: Answers and objections to interrogatories
+    cite: Ill. S. Ct. R. 213(d)
+    trigger: service of interrogatories
+    period: {days: 28}
+    service_applies: true
+  - id: il.production_minimum
+    title: Earliest response date for production requests
+    cite: Ill. S. Ct. R. 214(a)
+    trigger: service of the request
+    period: {days: 28}
+    service_applies: true
+    notes: The request sets the time, which cannot be less than 28 days absent agreement or order.
+  - id: il.rfa_responses
+    title: Responses to requests to admit (deemed admitted if late)
+    cite: Ill. S. Ct. R. 216(c)
+    trigger: service of requests
+    period: {days: 28}
+    service_applies: true
+  - id: il.post_trial_motion_jury
+    title: Post-trial motion (jury case)
+    cite: 735 ILCS 5/2-1202(c)
+    trigger: entry of judgment or discharge of the jury
+    period: {days: 30}
+  - id: il.post_judgment_motion_bench
+    title: Post-judgment motion (non-jury case)
+    cite: 735 ILCS 5/2-1203(a)
+    trigger: entry of judgment
+    period: {days: 30}
+  - id: il.notice_of_appeal
+    title: Notice of appeal
+    cite: Ill. S. Ct. R. 303(a)(1)
+    trigger: entry of final judgment (or order disposing of the last timely post-judgment motion)
+    period: {days: 30}
+  - id: il.cross_appeal
+    title: Separate appeal or cross-appeal
+    cite: Ill. S. Ct. R. 303(a)(3)
+    trigger: service of the first notice of appeal
+    period: {days: 10}
+    notes: Or within the 303(a)(1) period, whichever is later.
+  - id: il.interlocutory_appeal_307
+    title: Interlocutory appeal as of right
+    cite: Ill. S. Ct. R. 307(a)
+    trigger: entry of the interlocutory order
+    period: {days: 30}
+  - id: il.petition_leave_to_appeal
+    title: Petition for leave to appeal to the Illinois Supreme Court
+    cite: Ill. S. Ct. R. 315(b)
+    trigger: entry of the appellate court judgment
+    period: {days: 35}
+  - id: il.section_2_1401
+    title: Section 2-1401 petition for relief from judgment
+    cite: 735 ILCS 5/2-1401(c)
+    trigger: entry of the order or judgment
+    period: {months: 24}
+    notes: Fraudulent concealment and legal disability toll the period.

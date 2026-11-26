@@ -1,0 +1,22 @@
+{% if check_id %}<input type="hidden" name="conflict_check_id" value="{{ check_id }}">{% endif %}
+{% if not names %}
+  <p class="muted">Enter at least one name.</p>
+{% elif not results %}
+  <p class="ok">No prior appearances found for {{ names|length }} name{{ 's' if names|length != 1 }}. Check logged.</p>
+{% else %}
+  <p class="warn">{{ results|length }} possible match{{ 'es' if results|length != 1 }}. Review before opening.</p>
+  <table>
+    <thead><tr><th>Searched</th><th>Matched</th><th>Score</th><th>Role</th><th>Matter</th></tr></thead>
+    <tbody>
+    {% for r in results %}
+      <tr>
+        <td>{{ r.query }}</td>
+        <td>{{ r.matched_name }}{% if r.matched_alias %} <span class="muted">(alias {{ r.matched_alias }})</span>{% endif %}</td>
+        <td>{{ r.score }}</td>
+        <td>{{ r.role|replace('_', ' ') }}</td>
+        <td><a href="/matters/{{ r.matter_id }}" target="_blank">{{ r.short_name }}</a> <span class="muted">({{ r.side }}, {{ r.status }})</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+{% endif %}

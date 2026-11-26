@@ -1,0 +1,11 @@
+{% if parties %}
+<table>
+  <tbody>
+  {% for p in parties %}
+    <tr><td>{{ p.name }}{% if p.title %} <span class="muted">· {{ p.title }}</span>{% endif %}</td><td>{{ p.role|replace('_', ' ') }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="muted">No people yet.</p>
+{% endif %}

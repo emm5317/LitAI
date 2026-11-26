@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}{{ m.short_name }} · Law Practice Console{% endblock %}
+{% block content %}
+<section class="matter-head">
+  <div>
+    <h1>{{ m.short_name }}</h1>
+    <p class="muted">{{ m.caption }}{% if m.case_number %} · {{ m.case_number }}{% endif %}{% if m.forum_name %} · {{ m.forum_name }}{% endif %}</p>
+  </div>
+  <div class="tags">
+    <span class="tag tag-{{ m.side }}">representing {{ m.side }}</span>
+    <span class="tag">{{ m.status|replace('_', ' ') }}</span>
+    <span class="tag">{{ m.rules_profile or 'no rules profile' }}</span>
+    <span class="tag {{ '' if m.ai_permitted else 'tag-warn' }}">AI {{ 'permitted' if m.ai_permitted else 'off' }}</span>
+  </div>
+</section>
+{% if m.summary %}<p class="card">{{ m.summary }}</p>{% endif %}
+
+<section class="grid-2">
+  <div class="card">
+    <h2>Deadlines</h2>
+    {% if entries %}
+    <form class="inline-form" hx-post="/matters/{{ m.id }}/deadlines/compute" hx-target="#deadlines">
+      <select name="entry_id" required>
+        {% for rid, group in entries|groupby('ruleset_id') %}
+        <optgroup label="{{ rulesets[rid].name }}">
+          {% for e in group %}<option value="{{ e.id }}">{{ e.title }} · {{ e.cite }}</option>{% endfor %}
+        </optgroup>
+        {% endfor %}
+      </select>
+      <input type="date" name="trigger_date" required>
+      <select name="service_method">
+        <option value="">Service method (if it matters)</option>
+        {% for s in service_methods %}<option value="{{ s }}">{{ s|replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <button type="submit">Calculate</button>
+    </form>
+    {% else %}
+      <p class="muted">Set a rules profile on this matter to calculate deadlines.</p>
+    {% endif %}
+    <div id="deadlines">{% include "partials/deadlines.html" %}</div>
+  </div>
+
+  <div class="card">
+    <h2>People</h2>
+    <div id="parties">{% include "partials/parties.html" %}</div>
+    <form class="inline-form" hx-post="/matters/{{ m.id }}/parties" hx-target="#parties" hx-on::after-request="this.reset()">
+      <input name="name" placeholder="Name" required>
+      <select name="role">
+        {% for r in ['witness','decision_maker','comparator','client_contact','opposing_counsel','adverse_party','co_party','expert','related_entity','other'] %}
+        <option value="{{ r }}">{{ r|replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <select name="kind"><option value="person">Person</option><option value="organization">Organization</option></select>
+      <input name="title" placeholder="Title (optional)">
+      <button type="submit">Add</button>
+    </form>
+  </div>
+</section>
+
+<section class="grid-2">
+  <div class="card">
+    <h2>Documents</h2>
+    <form class="inline-form" hx-post="/matters/{{ m.id }}/documents" hx-target="#documents" hx-encoding="multipart/form-data">
+      <input type="file" name="files" multiple required>
+      <select name="doc_type">
+        {% for t in ['complaint','answer','motion','brief','order','correspondence','discovery_request','discovery_response','production','transcript','exhibit','contract','policy','payroll_data','other'] %}
+        <option value="{{ t }}" {{ 'selected' if t == 'other' }}>{{ t|replace('_', ' ') }}</option>{% endfor %}
+      </select>
+      <button type="submit">Add to matter</button>
+    </form>
+    <div id="documents">{% include "partials/documents.html" %}</div>
+  </div>
+
+  <div class="card">
+    <h2>Search this matter</h2>
+    <input type="search" name="q" placeholder="Words or phrases"
+           hx-get="/search" hx-vals='{"matter_id": {{ m.id }}}' hx-trigger="input changed delay:250ms, search" hx-target="#matter-search">
+    <div id="matter-search"></div>
+    <h3>Recent changes</h3>
+    <ul class="changes">
+      {% for c in changes %}<li><span class="muted">{{ c.at[:10] }}</span> {{ c.summary }}</li>{% endfor %}
+    </ul>
+    <p class="muted small">Folder: {{ m.folder_path }}</p>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+.pytest_cache/
+# downloaded rule texts are reproducible from scripts/fetch_rules.ps1
+rules/sources/*
+!rules/sources/.gitkeep
+# never commit client data
+*.sqlite3
+*.sqlite3-*

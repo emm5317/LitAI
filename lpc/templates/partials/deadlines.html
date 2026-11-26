@@ -1,0 +1,21 @@
+{% if deadlines %}
+<ul class="deadline-list">
+  {% for d in deadlines %}
+  <li class="deadline status-{{ d.status }}">
+    <div>
+      <span class="date">{{ d.due_on }}</span> <strong>{{ d.title }}</strong>
+      <span class="muted">{{ d.rule_cite or '' }}</span>
+      {% if d.status == 'proposed' %}<span class="tag tag-warn">proposed</span>{% elif d.status == 'confirmed' %}<span class="tag tag-ok">confirmed</span>{% else %}<span class="tag">{{ d.status }}</span>{% endif %}
+    </div>
+    {% if d.computation %}<details><summary>How this was calculated</summary><p class="small">{{ d.computation }}</p></details>{% endif %}
+    <div class="actions">
+      {% if d.status == 'proposed' %}<button hx-post="/deadlines/{{ d.id }}/confirm" hx-target="#deadlines">Confirm</button>{% endif %}
+      {% if d.status == 'confirmed' %}<button hx-post="/deadlines/{{ d.id }}/done" hx-target="#deadlines">Mark done</button>{% endif %}
+      <button class="link" hx-post="/deadlines/{{ d.id }}/vacate" hx-target="#deadlines" hx-confirm="Remove this deadline?">Remove</button>
+    </div>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}
+  <p class="muted">No deadlines yet.</p>
+{% endif %}

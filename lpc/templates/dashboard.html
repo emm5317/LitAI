@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="grid-2">
+  <div class="card">
+    <h2>Matters</h2>
+    {% if matters %}
+    <table>
+      <thead><tr><th>Matter</th><th>Side</th><th>Status</th><th>Forum</th><th>Next deadline</th><th>Open tasks</th></tr></thead>
+      <tbody>
+      {% for m in matters %}
+        <tr>
+          <td><a href="/matters/{{ m.id }}"><strong>{{ m.short_name }}</strong></a><br><span class="muted">{{ m.caption }}</span></td>
+          <td><span class="tag tag-{{ m.side }}">{{ m.side }}</span></td>
+          <td>{{ m.status|replace('_', ' ') }}</td>
+          <td>{{ m.forum_name or '' }}{% if m.case_number %}<br><span class="muted">{{ m.case_number }}</span>{% endif %}</td>
+          <td>{{ m.next_deadline or '—' }}{% if m.unconfirmed_deadlines %} <span class="tag tag-warn">{{ m.unconfirmed_deadlines }} to confirm</span>{% endif %}</td>
+          <td>{{ m.open_tasks }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+      <p class="muted">No matters yet. <a href="/matters/new">Open the first one</a>.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <h2>Upcoming deadlines</h2>
+    {% if upcoming %}
+    <ul class="deadline-list">
+      {% for d in upcoming %}
+      <li class="{{ 'overdue' if d.due_on < today else '' }}">
+        <span class="date">{{ d.due_on }}</span>
+        <a href="/matters/{{ d.matter_id }}">{{ d.short_name }}</a> · {{ d.title }}
+        {% if d.status == 'proposed' %}<span class="tag tag-warn">unconfirmed</span>{% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="muted">Nothing scheduled.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

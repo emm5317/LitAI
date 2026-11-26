@@ -1,0 +1,55 @@
+# Federal statutory periods that come up in employment litigation and arbitration.
+# Statutes are not "periods in these rules", but courts generally count them the
+# same way as FRCP 6(a); confirm for the specific statute.
+id: federal_statutes
+name: Federal statutes (removal, FAA, employment charges)
+jurisdiction: federal
+counting: frcp6a
+holidays:
+  all: [federal]
+sources: [us_code]
+verified: false
+entries:
+  - id: usc.removal
+    title: Notice of removal
+    cite: 28 U.S.C. 1446(b)(1)
+    trigger: receipt of the initial pleading (through service or otherwise)
+    period: {days: 30}
+  - id: usc.removal_diversity_outer
+    title: Outside limit to remove a diversity case on later-revealed grounds
+    cite: 28 U.S.C. 1446(c)(1)
+    trigger: commencement of the action
+    period: {months: 12}
+    notes: Subject to the bad-faith exception in the statute.
+  - id: usc.remand_procedural
+    title: Motion to remand for a non-jurisdictional defect
+    cite: 28 U.S.C. 1447(c)
+    trigger: filing of the notice of removal
+    period: {days: 30}
+  - id: faa.vacate_modify
+    title: Serve motion to vacate, modify, or correct arbitration award
+    cite: 9 U.S.C. 12
+    trigger: award filed or delivered
+    period: {months: 3}
+  - id: faa.confirm
+    title: Apply to confirm arbitration award
+    cite: 9 U.S.C. 9
+    trigger: award made
+    period: {months: 12}
+  - id: title7.charge_deferral_state
+    title: EEOC charge (deferral state such as Illinois)
+    cite: 42 U.S.C. 2000e-5(e)(1)
+    trigger: alleged unlawful employment practice
+    period: {days: 300}
+  - id: title7.suit_after_notice
+    title: Sue after notice of right to sue
+    cite: 42 U.S.C. 2000e-5(f)(1)
+    trigger: receipt of right-to-sue notice
+    period: {days: 90}
+  - id: flsa.limitations
+    title: FLSA limitations (non-willful)
+    cite: 29 U.S.C. 255(a)
+    trigger: accrual (each affected payday)
+    period: {months: 24}
+    hard: false
+    notes: 3 years for willful violations. For opt-ins, the claim is commenced when the written consent is filed (29 U.S.C. 256).

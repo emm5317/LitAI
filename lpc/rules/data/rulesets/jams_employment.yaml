@@ -1,0 +1,69 @@
+# JAMS Employment Arbitration Rules & Procedures, effective June 1, 2021.
+# Calendar days; a weekend or holiday end date runs to the next business day, and
+# 3 days are added for service by U.S. mail (Rule 8(f)).
+id: jams_employment
+name: JAMS Employment Arbitration Rules (eff. June 1, 2021)
+jurisdiction: arbitration
+counting: calendar_rollover
+holidays:
+  all: [federal]
+service:
+  add_days: {mail: 3, electronic: 0, hand: 0}
+base: [federal_statutes]
+sources: [jams_employment_rules, jams_appeal]
+verified: false
+entries:
+  - id: jams.answer
+    title: Answer, affirmative defenses and counterclaim
+    cite: JAMS Employment R. 9(c)
+    trigger: service of the notice of claim
+    period: {days: 14}
+    service_applies: true
+    notes: JAMS may extend before the arbitrator is appointed.
+  - id: jams.counterclaim_response
+    title: Response to counterclaim
+    cite: JAMS Employment R. 9(d)
+    trigger: service of the counterclaim
+    period: {days: 14}
+    service_applies: true
+  - id: jams.strike_list
+    title: Return arbitrator strike-and-rank list
+    cite: JAMS Employment R. 15(c)
+    trigger: service of the list
+    period: {days: 7}
+    service_applies: true
+  - id: jams.arbitrator_disclosures
+    title: Arbitrator's disclosures due
+    cite: JAMS Employment R. 15(h)
+    trigger: appointment of the arbitrator
+    period: {days: 10}
+    hard: false
+  - id: jams.challenge_response
+    title: Response to challenge to arbitrator
+    cite: JAMS Employment R. 15(i)
+    trigger: service of the challenge
+    period: {days: 7}
+    service_applies: true
+  - id: jams.award_due
+    title: Award due from arbitrator
+    cite: JAMS Employment R. 24(a)
+    trigger: close of hearing
+    period: {days: 30}
+    hard: false
+  - id: jams.correct_award
+    title: Request to correct award
+    cite: JAMS Employment R. 24(j)
+    trigger: service of the award
+    period: {days: 7}
+    service_applies: true
+  - id: jams.correct_award_response
+    title: Response to request to correct award
+    cite: JAMS Employment R. 24(j)
+    trigger: service of the request
+    period: {days: 7}
+    service_applies: true
+  - id: jams.optional_appeal
+    title: Notice of appeal under JAMS Optional Arbitration Appeal Procedure (only if agreed)
+    cite: JAMS Optional Appeal Procedure (B)
+    trigger: award becomes final
+    period: {days: 14}

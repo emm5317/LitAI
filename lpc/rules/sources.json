@@ -1,0 +1,112 @@
+{
+  "checked_on": "2026-11-26",
+  "note": "Official sources for each ruleset. 'download' entries are fetched by scripts/fetch_rules.ps1 (or python -m lpc.rules.fetch) into rules/sources/. Re-check version notes before relying on a rules file.",
+  "sources": [
+    {
+      "id": "frcp",
+      "title": "Federal Rules of Civil Procedure",
+      "publisher": "U.S. Courts",
+      "landing": "https://www.uscourts.gov/rules-policies/current-rules-practice-procedure/federal-rules-civil-procedure",
+      "alternate": "https://www.law.cornell.edu/rules/frcp",
+      "download": null,
+      "version_note": "Amendments effective Dec. 1, 2025 (Rules 16, 16.1 new, 26). Next Civil Rules package (7.1, 26, 41, 45, 81) is on the Dec. 1, 2027 track. Download the current PDF from the landing page."
+    },
+    {
+      "id": "frap",
+      "title": "Federal Rules of Appellate Procedure",
+      "publisher": "U.S. Courts",
+      "landing": "https://www.uscourts.gov/rules-policies/current-rules-practice-procedure/federal-rules-appellate-procedure",
+      "alternate": "https://www.law.cornell.edu/rules/frap",
+      "download": null,
+      "version_note": "Amendments effective Dec. 1, 2025 (Rules 6, 39). Check whether Rule 29 (amicus) amendments took effect Dec. 1, 2026."
+    },
+    {
+      "id": "ndil_local_rules",
+      "title": "Local Rules of the U.S. District Court for the Northern District of Illinois",
+      "publisher": "N.D. Ill.",
+      "landing": "https://www.ilnd.uscourts.gov/",
+      "download": "https://www.ilnd.uscourts.gov/_assets/_documents/_rules/lrrules.pdf",
+      "version_note": "PDF states amendments through May 4, 2026. Judges' standing orders are on each judge's page."
+    },
+    {
+      "id": "ca7_rules",
+      "title": "FRAP, Circuit Rules and Operating Procedures of the Seventh Circuit",
+      "publisher": "U.S. Court of Appeals for the Seventh Circuit",
+      "landing": "https://www.ca7.uscourts.gov/",
+      "download": "https://www.ca7.uscourts.gov/assets/pdf/rules.pdf",
+      "version_note": "Last version seen stated it was current as of Dec. 31, 2024; check for a newer compilation."
+    },
+    {
+      "id": "ca7_handbook",
+      "title": "Practitioner's Handbook for Appeals to the Seventh Circuit",
+      "publisher": "U.S. Court of Appeals for the Seventh Circuit",
+      "landing": "https://www.ca7.uscourts.gov/",
+      "download": "https://www.ca7.uscourts.gov/assets/pdf/Handbook.pdf",
+      "version_note": "2020 edition."
+    },
+    {
+      "id": "il_supreme_court_rules",
+      "title": "Illinois Supreme Court Rules",
+      "publisher": "Illinois Courts",
+      "landing": "https://www.illinoiscourts.gov/rules/supreme-court-rules",
+      "download": null,
+      "version_note": "Each rule has its own page/PDF with its amendment date. Save Rules 12, 181, 182, 213, 214, 216, 218, 303, 307 and 315 at minimum."
+    },
+    {
+      "id": "ilcs",
+      "title": "Illinois Compiled Statutes (735 ILCS 5 Code of Civil Procedure; 5 ILCS 70/1.11; 205 ILCS 630/17)",
+      "publisher": "Illinois General Assembly",
+      "landing": "https://www.ilga.gov/legislation/ilcs/ilcs.asp",
+      "download": null,
+      "version_note": "Statute on Statutes 1.11 governs state-law time computation; 205 ILCS 630/17 lists Illinois holidays."
+    },
+    {
+      "id": "cook_rules",
+      "title": "Rules of the Circuit Court of Cook County",
+      "publisher": "Circuit Court of Cook County",
+      "landing": "https://www.cookcountycourtil.gov/about/circuit-court-rules",
+      "download": null,
+      "version_note": "Organized by Part; Part 3 covers proceedings before trial. Also check the court's Legal Court Holidays page."
+    },
+    {
+      "id": "cook_general_orders",
+      "title": "General Orders of the Circuit Court of Cook County",
+      "publisher": "Circuit Court of Cook County",
+      "landing": "https://cookcountycourtil.gov/about/general-orders-cook-county-circuit-court",
+      "download": null,
+      "version_note": "Division-specific procedures (Law Division, Chancery) live in general orders."
+    },
+    {
+      "id": "aaa_employment_rules",
+      "title": "AAA Employment/Workplace Arbitration Rules and Mediation Procedures",
+      "publisher": "American Arbitration Association",
+      "landing": "https://adr.org/rules-forms-and-fees/employment/",
+      "download": "https://www.adr.org/media/0vrpbnm0/2025_employment_arbitration_rules.pdf",
+      "version_note": "Amended and effective May 1, 2025. Older versions are in the AAA archive; the rules in effect when the demand was filed control."
+    },
+    {
+      "id": "jams_employment_rules",
+      "title": "JAMS Employment Arbitration Rules & Procedures",
+      "publisher": "JAMS",
+      "landing": "https://www.jamsadr.com/rules-employment-arbitration/",
+      "download": "https://www.jamsadr.com/rules-employment-arbitration/",
+      "version_note": "Effective June 1, 2021 (saved as HTML)."
+    },
+    {
+      "id": "jams_appeal",
+      "title": "JAMS Optional Arbitration Appeal Procedure",
+      "publisher": "JAMS",
+      "landing": "https://www.jamsadr.com/appeal",
+      "download": "https://www.jamsadr.com/appeal",
+      "version_note": "Applies only if the parties agreed to it."
+    },
+    {
+      "id": "us_code",
+      "title": "United States Code (28 U.S.C. 1446-1447; 9 U.S.C. 9-12; 42 U.S.C. 2000e-5; 29 U.S.C. 255-256)",
+      "publisher": "Office of the Law Revision Counsel",
+      "landing": "https://uscode.house.gov/",
+      "download": null,
+      "version_note": "Use the official U.S. Code site for current text."
+    }
+  ]
+}

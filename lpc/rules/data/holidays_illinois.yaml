@@ -1,0 +1,21 @@
+# Illinois holidays beyond the federal list.
+# Used for state-court periods (Statute on Statutes, 5 ILCS 70/1.11) and, under
+# FRCP 6(a)(6)(C) / FRAP 26(a)(6)(C), for federal periods counted forward from an
+# event in a court located in Illinois.
+#
+# VERIFY each year against 205 ILCS 630/17 and the Circuit Court of Cook County's
+# "Legal Court Holidays" page. Courts sometimes close on days not listed here;
+# add those to closures.yaml.
+verified: false
+holidays:
+  - name: Lincoln's Birthday
+    rule: fixed
+    month: 2
+    day: 12
+  - name: Casimir Pulaski Day
+    rule: nth_weekday
+    month: 3
+    weekday: 0   # Monday
+    n: 1
+  - name: General Election Day
+    rule: general_election   # first Tuesday after the first Monday in November, even years

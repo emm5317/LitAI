@@ -1,0 +1,17 @@
+# Circuit Court of Cook County: Cook County Circuit Court Rules on top of the Illinois
+# Supreme Court Rules. The local rules mostly govern procedure and calendars rather than
+# adding periods; Law Division deadlines usually come from case management orders, so
+# enter those as court-order deadlines.
+id: cook
+name: Circuit Court of Cook County (local rules + Illinois)
+jurisdiction: illinois
+counting: illinois
+holidays:
+  all: [federal, illinois]
+base: [illinois]
+sources: [cook_rules, cook_general_orders]
+verified: false
+notes: >
+  Check the Cook County "Legal Court Holidays" page each year and add any extra court
+  closings to closures.yaml. Add local-rule periods here as you confirm them.
+entries: []

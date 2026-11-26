@@ -1,0 +1,64 @@
+:root {
+  --ink: #1d1d1f; --muted: #6b6b70; --line: #e3e1dc; --bg: #f7f6f3; --card: #ffffff;
+  --accent: #1f4e79; --warn-bg: #fdf1dc; --warn: #8a5a00; --ok-bg: #e5f4e4; --ok: #2c6e2f;
+  --employer: #e7f1fb; --employee: #efedff;
+}
+* { box-sizing: border-box; }
+[x-cloak] { display: none !important; }
+body { margin: 0; font: 14px/1.45 "Segoe UI", system-ui, sans-serif; color: var(--ink); background: var(--bg); }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+h1 { font-size: 22px; margin: 0 0 4px; }
+h2 { font-size: 15px; margin: 0 0 12px; }
+h3 { font-size: 13px; margin: 16px 0 8px; color: var(--muted); }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 10px 24px;
+          background: var(--card); border-bottom: 1px solid var(--line); }
+.brand { font-weight: 600; color: var(--ink); }
+.topbar nav { display: flex; gap: 18px; align-items: center; }
+kbd { font-size: 11px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }
+main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 16px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
+.grid-2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 16px; }
+@media (max-width: 1000px) { .grid-2 { grid-template-columns: 1fr; } }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 12px; color: var(--muted); font-weight: 600; }
+.muted { color: var(--muted); }
+.small { font-size: 12px; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; background: #f0efec; }
+.tag-employer { background: var(--employer); }
+.tag-employee { background: var(--employee); }
+.tag-warn { background: var(--warn-bg); color: var(--warn); }
+.tag-ok { background: var(--ok-bg); color: var(--ok); }
+.ok { color: var(--ok); }
+.warn { color: var(--warn); }
+.matter-head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+input, select, textarea, button { font: inherit; }
+input, select, textarea { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+textarea { width: 100%; }
+button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 6px; background: #fff; cursor: pointer; }
+button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+button.link { border: none; background: none; color: var(--accent); padding: 0; }
+.form fieldset { border: none; padding: 0; margin: 0 0 20px; }
+.form legend { font-weight: 600; margin-bottom: 8px; }
+.form label { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; flex: 1; }
+.form label.check { flex-direction: row; align-items: center; gap: 8px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.inline-form { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.inline-form select { max-width: 320px; }
+.deadline-list { list-style: none; padding: 0; margin: 0; }
+.deadline-list li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.deadline-list .date { font-variant-numeric: tabular-nums; font-weight: 600; margin-right: 6px; }
+.deadline-list li.overdue .date { color: #a33; }
+.deadline .actions { display: flex; gap: 10px; margin-top: 4px; }
+details summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.changes { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+.hit { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.snippet { color: var(--muted); font-size: 13px; }
+mark { background: #f9eeda; padding: 0 1px; }
+.palette { position: fixed; inset: 0; background: rgba(0,0,0,.25); display: flex; justify-content: center; align-items: flex-start; padding-top: 12vh; }
+.palette-box { width: min(720px, 92vw); background: #fff; border-radius: 10px; padding: 12px; max-height: 70vh; overflow: auto;
+               box-shadow: 0 10px 40px rgba(0,0,0,.2); }
+.palette-box input { width: 100%; font-size: 16px; padding: 10px; }

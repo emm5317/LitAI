@@ -1,0 +1,107 @@
+# Federal Rules of Appellate Procedure - baseline for the courts of appeals.
+id: frap
+name: Federal Rules of Appellate Procedure
+jurisdiction: federal
+counting: frcp6a          # FRAP 26(a) uses the same counting text as FRCP 6(a)
+holidays:
+  all: [federal]
+service:
+  # FRAP 26(c): 3 days added unless the paper is served electronically or delivered
+  # on the date of service stated in the proof of service.
+  add_days: {mail: 3, leave_with_clerk: 3, other_consented: 3, electronic: 0, hand: 0}
+sources: [frap]
+verified: false
+entries:
+  - id: frap.notice_of_appeal
+    title: Notice of appeal (civil)
+    cite: Fed. R. App. P. 4(a)(1)(A)
+    trigger: entry of judgment or appealable order
+    period: {days: 30}
+    notes: A timely Rule 50(b), 52(b), 54 (fees, in some cases), 59 or 60 motion resets the clock under 4(a)(4).
+  - id: frap.notice_of_appeal_us_party
+    title: Notice of appeal when the United States is a party
+    cite: Fed. R. App. P. 4(a)(1)(B)
+    trigger: entry of judgment or appealable order
+    period: {days: 60}
+  - id: frap.cross_appeal
+    title: Cross-appeal (or other party's notice of appeal)
+    cite: Fed. R. App. P. 4(a)(3)
+    trigger: first notice of appeal filed
+    period: {days: 14}
+    notes: Or within the time otherwise allowed by 4(a), whichever is later.
+  - id: frap.extension_motion
+    title: Motion to extend time to appeal
+    cite: Fed. R. App. P. 4(a)(5)(A)(i)
+    trigger: expiration of the 4(a) appeal period
+    period: {days: 30}
+  - id: frap.permission_answer
+    title: Answer to petition for permission to appeal
+    cite: Fed. R. App. P. 5(b)(2)
+    trigger: service of the petition
+    period: {days: 10}
+    service_applies: true
+  - id: frap.transcript_order
+    title: Order transcript (or certify none needed)
+    cite: Fed. R. App. P. 10(b)(1)
+    trigger: notice of appeal filed (or order disposing of last tolling motion)
+    period: {days: 14}
+  - id: frap.motion_response
+    title: Response to motion
+    cite: Fed. R. App. P. 27(a)(3)(A)
+    trigger: service of the motion
+    period: {days: 10}
+    service_applies: true
+  - id: frap.motion_reply
+    title: Reply to response to motion
+    cite: Fed. R. App. P. 27(a)(4)
+    trigger: service of the response
+    period: {days: 7}
+    service_applies: true
+  - id: frap.appellant_brief
+    title: Appellant's brief (absent scheduling order)
+    cite: Fed. R. App. P. 31(a)(1)
+    trigger: record filed
+    period: {days: 40}
+    notes: The Seventh Circuit usually sets the briefing schedule by order.
+  - id: frap.appellee_brief
+    title: Appellee's brief (absent scheduling order)
+    cite: Fed. R. App. P. 31(a)(1)
+    trigger: service of appellant's brief
+    period: {days: 30}
+    service_applies: true
+  - id: frap.reply_brief
+    title: Reply brief (absent scheduling order)
+    cite: Fed. R. App. P. 31(a)(1)
+    trigger: service of appellee's brief
+    period: {days: 21}
+    service_applies: true
+    notes: Must also be filed at least 7 days before argument unless the court allows otherwise.
+  - id: frap.amicus_brief
+    title: Amicus brief supporting a party
+    cite: Fed. R. App. P. 29(a)(6)
+    trigger: filing of the principal brief of the party supported
+    period: {days: 7}
+    notes: Check for amendments to Rule 29 (amicus disclosure changes were on the Dec. 1, 2026 track).
+  - id: frap.rehearing
+    title: Petition for panel or en banc rehearing
+    cite: Fed. R. App. P. 40(d)(1)
+    trigger: entry of judgment
+    period: {days: 14}
+    notes: 45 days in civil cases where the United States or its officer or agency is a party. Rules 35 and 40 were consolidated in 2024; verify the subsection.
+  - id: frap.bill_of_costs
+    title: Bill of costs
+    cite: Fed. R. App. P. 39(d)(1)
+    trigger: entry of judgment
+    period: {days: 14}
+  - id: frap.costs_objections
+    title: Objections to bill of costs
+    cite: Fed. R. App. P. 39(d)(2)
+    trigger: service of the bill of costs
+    period: {days: 14}
+    service_applies: true
+  - id: frap.mandate
+    title: Mandate issues (absent motion or order)
+    cite: Fed. R. App. P. 41(b)
+    trigger: expiration of time to petition for rehearing
+    period: {days: 7}
+    hard: false

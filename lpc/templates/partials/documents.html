@@ -1,0 +1,17 @@
+{% if documents %}
+<table>
+  <thead><tr><th>Title</th><th>Type</th><th>Pages</th><th>Text</th></tr></thead>
+  <tbody>
+  {% for d in documents %}
+    <tr>
+      <td>{{ d.title }}<br><span class="muted small">{{ d.file_path }}</span></td>
+      <td>{{ d.doc_type|replace('_', ' ') }}</td>
+      <td>{{ d.page_count or '—' }}</td>
+      <td>{% if d.text_status == 'low_text' %}<span class="tag tag-warn">needs OCR</span>{% else %}{{ d.text_status|replace('_', ' ') }}{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+  <p class="muted">No documents yet.</p>
+{% endif %}

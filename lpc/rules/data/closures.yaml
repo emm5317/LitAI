@@ -1,0 +1,8 @@
+# One-off closures that count as holidays: a day the President declares a holiday,
+# a court's closure order, or a clerk's office closing (FRCP 6(a)(3)).
+# Format:
+#   closures:
+#     - date: 2027-01-09
+#       reason: "Presidential proclamation - national day of mourning"
+#       courts: [federal]        # informational
+closures: []

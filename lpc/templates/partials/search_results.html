@@ -1,0 +1,9 @@
+{% if q and not hits %}
+  <p class="muted">No matches.</p>
+{% endif %}
+{% for h in hits %}
+<div class="hit">
+  <div><a href="/matters/{{ h.matter_id }}">{{ h.short_name }}</a> · <strong>{{ h.title }}</strong> <span class="muted">p. {{ h.page_no }}</span></div>
+  <div class="snippet">{{ h.snippet|highlight }}</div>
+</div>
+{% endfor %}

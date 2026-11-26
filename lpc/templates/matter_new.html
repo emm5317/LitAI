@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}New matter · Law Practice Console{% endblock %}
+{% block content %}
+<form class="card form" method="post" action="/matters">
+  <h2>Open a matter</h2>
+
+  <fieldset>
+    <legend>1. Conflicts check</legend>
+    <p class="muted">List every party, affiliate, and opposing counsel, one per line. Run the check before opening the matter.</p>
+    <textarea name="names" rows="5" placeholder="Acme Logistics, Inc.&#10;Jane Doe&#10;Smith & Jones LLP"></textarea>
+    <button type="button" hx-post="/conflicts/check" hx-include="[name=names]" hx-target="#conflict-results">Run conflicts check</button>
+    <div id="conflict-results"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>2. Matter</legend>
+    <div class="row">
+      <label>Short name <input name="short_name" required placeholder="Doe v. Acme"></label>
+      <label>Caption <input name="caption" required placeholder="Jane Doe v. Acme Logistics, Inc."></label>
+    </div>
+    <div class="row">
+      <label>We represent the
+        <select name="side" required>
+          <option value="employer">Employer</option>
+          <option value="employee">Employee</option>
+        </select>
+      </label>
+      <label>Matter type
+        <select name="matter_type">
+          <option value="single_plaintiff">Single plaintiff</option>
+          <option value="class">Class action</option>
+          <option value="collective">Collective action</option>
+          <option value="hybrid_class_collective">Hybrid class/collective</option>
+          <option value="individual_arbitration">Individual arbitration</option>
+          <option value="mass_arbitration">Mass arbitration</option>
+          <option value="pre_suit">Pre-suit</option>
+          <option value="agency_charge">Agency charge</option>
+          <option value="appeal">Appeal</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Forum
+        <select name="forum_type">
+          <option value="federal_district">Federal district court</option>
+          <option value="federal_appeals">Federal court of appeals</option>
+          <option value="state_trial">State trial court</option>
+          <option value="state_appeals">State appellate court</option>
+          <option value="aaa">AAA arbitration</option>
+          <option value="jams">JAMS arbitration</option>
+          <option value="agency">Agency</option>
+          <option value="pre_suit">Pre-suit</option>
+        </select>
+      </label>
+      <label>Deadline rules
+        <select name="rules_profile">
+          <option value="">Match the forum</option>
+          {% for p in profiles.values() %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <label>Court or forum name <input name="forum_name" placeholder="U.S. District Court, N.D. Ill."></label>
+      <label>Case number <input name="case_number" placeholder="1:26-cv-01234"></label>
+      <label>Judge or arbitrator <input name="judge"></label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>3. Parties</legend>
+    <div class="row">
+      <label>Client <input name="client_name" placeholder="Client name"></label>
+      <label>Client is
+        <select name="client_kind"><option value="organization">An organization</option><option value="person">A person</option></select>
+      </label>
+    </div>
+    <label>Adverse parties (one per line) <textarea name="adverse_names" rows="3"></textarea></label>
+    <label>Opposing counsel (one per line) <textarea name="opposing_counsel" rows="2"></textarea></label>
+  </fieldset>
+
+  <fieldset>
+    <legend>4. Summary and AI consent</legend>
+    <label>Summary <textarea name="summary" rows="3"></textarea></label>
+    <label class="check"><input type="checkbox" name="ai_permitted" value="1"> Client has consented to AI-assisted work on this matter</label>
+  </fieldset>
+
+  <button class="primary" type="submit">Open matter</button>
+</form>
+{% endblock %}
