@@ -17,6 +17,7 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
 
 from . import __version__
+from .backup import list_backups
 from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
 from .ingest import ingest_file, search
@@ -116,8 +117,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "SELECT d.*, m.short_name FROM deadlines d JOIN matters m ON m.id = d.matter_id"
             " WHERE d.status IN ('proposed', 'confirmed') ORDER BY d.due_on LIMIT 25"
         ).fetchall()
+        backups = list_backups(settings.backup_dir)
         return templates.TemplateResponse(request, "dashboard.html", {
             "matters": list_matters(db()), "upcoming": upcoming, "today": dt.date.today().isoformat(),
+            "last_backup": backups[-1].stem.removeprefix("lpc-") if backups else None,
+            "backup_dir": settings.backup_dir,
         })
 
     @app.get("/matters/new", response_class=HTMLResponse)

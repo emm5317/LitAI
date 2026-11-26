@@ -41,4 +41,8 @@
     {% endif %}
   </div>
 </section>
+<p class="muted small">
+  {% if last_backup %}Last database backup: {{ last_backup }} · {{ backup_dir }}
+  {% else %}<span class="tag tag-warn">No database backup yet</span> Backups go to {{ backup_dir }}{% endif %}
+</p>
 {% endblock %}

@@ -42,10 +42,16 @@ def main() -> None:
     args = parser.parse_args()
 
     from .app import create_app
+    from .backup import start_daily_backups
+    from .config import load_settings
+
+    settings = load_settings()
+    app = create_app(settings)          # applies any new migrations first
+    start_daily_backups(settings.db_path, settings.backup_dir)
 
     port = args.port or _free_port()
     url = f"http://127.0.0.1:{port}"
-    config = uvicorn.Config(create_app(), host="127.0.0.1", port=port, log_level="warning")
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning")
     server = uvicorn.Server(config)
 
     if args.server_only:
