@@ -75,7 +75,7 @@ def test_ingest_and_search(conn, settings, tmp_path):
     m = get_matter(conn, mid)
     root = matter_folder(m, settings.matters_dir)
     doc_id = ingest_file(conn, m, root, src, doc_type="contract")
-    assert ingest_file(conn, m, root, src) == doc_id   # same hash, no duplicate
+    assert doc_id.added and ingest_file(conn, m, root, src) == (doc_id.id, False)   # same hash, no duplicate
     assert (root / "10 Source" / "offer_letter.txt").is_file()
     hits = search(conn, "exempt salary", mid)
     assert hits and hits[0]["title"] == "offer_letter" and hits[0]["page_no"] == 1

@@ -214,8 +214,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "m": m,
             "folder": matter_folder(m, settings.matters_dir),
             "parties": matter_parties(c, matter_id),
-            "documents": c.execute("SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC",
-                                   (matter_id,)).fetchall(),
+            "documents": matter_documents(matter_id),
             "deadlines": live_deadlines(matter_id),
             "entries": entries_for(profile) if profile in load_rulesets() else [],
             "service_methods": SERVICE_METHODS,
@@ -280,9 +279,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     shutil.copyfileobj(up.file, fh)
                 ingest_file(db(), m, matter_folder(m, settings.matters_dir), path,
                             doc_type=doc_type, source="internal")
-        docs = db().execute("SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC",
-                            (matter_id,)).fetchall()
-        return templates.TemplateResponse(request, "partials/documents.html", {"documents": docs})
+        return templates.TemplateResponse(request, "partials/documents.html", {"documents": matter_documents(matter_id)})
 
     @app.get("/search", response_class=HTMLResponse)
     def search_view(request: Request, q: str = "", matter_id: int | None = None):
@@ -378,6 +375,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log_change(db(), row["matter_id"], "deadlines", deadline_id, f"Deadline {status}: {row['title']}")
         db().commit()
         return _deadlines_partial(request, row["matter_id"])
+
+    def matter_documents(matter_id: int) -> list[sqlite3.Row]:
+        """Newest first, with each email's attachments listed right under it."""
+        return db().execute("SELECT * FROM documents WHERE matter_id = ?"
+                            " ORDER BY COALESCE(parent_id, id) DESC, parent_id IS NOT NULL, id",
+                            (matter_id,)).fetchall()
 
     def live_deadlines(matter_id: int) -> list[sqlite3.Row]:
         return db().execute("SELECT * FROM deadlines WHERE matter_id = ? AND status IN ('proposed', 'confirmed', 'done')"
