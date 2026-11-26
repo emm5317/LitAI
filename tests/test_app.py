@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from lpc.app import create_app
+from lpc.jobs import run_pending
 
 
 def make_client(settings) -> TestClient:
@@ -44,13 +45,16 @@ def test_end_to_end(settings):
     r = client.post(f"/matters/{mid}/documents",
                     files={"files": ("policy.txt", b"Employees must clock in before donning protective gear.")},
                     data={"doc_type": "policy"})
-    assert "policy" in r.text
+    assert "Upload of 1 file" in r.text
+    run_pending(client.app.state.conn, settings.matters_dir)     # the background worker's job
+    assert "policy" in client.get(f"/matters/{mid}/documents").text
     r = client.get("/search", params={"q": "donning", "matter_id": mid})
     assert "<mark>donning</mark>" in r.text
 
     # document text is escaped in search results
     client.post(f"/matters/{mid}/documents",
                 files={"files": ("x.txt", b"<script>alert(1)</script> overtime")}, data={"doc_type": "other"})
+    run_pending(client.app.state.conn, settings.matters_dir)
     r = client.get("/search", params={"q": "overtime"})
     assert "<script>" not in r.text
 

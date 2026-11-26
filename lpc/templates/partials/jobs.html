@@ -1,0 +1,18 @@
+<div id="jobs" {% if active %}hx-get="/matters/{{ matter_id }}/jobs?polling=1" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  {% for j in jobs %}
+  <div class="job job-{{ j.status }}">
+    <strong>{{ j.label }}</strong>
+    {% if j.status == 'queued' %}<span class="muted">waiting to start...</span>
+    {% elif j.status == 'running' %}
+      <span class="muted">{{ j.done_count }} of {{ j.total if j.total is not none else '?' }} files</span>
+      {% if j.total %}<progress value="{{ j.done_count }}" max="{{ j.total }}"></progress>{% endif %}
+    {% elif j.status == 'done' %}<span class="ok">{{ j.summary }}</span>
+    {% else %}<span class="warn">Stopped: {{ j.error }}</span>{% endif %}
+    {% if j.problem_list %}
+    <details><summary>{{ j.problem_list|length }} file{{ 's' if j.problem_list|length != 1 }} to look at</summary>
+      <ul class="small">{% for p in j.problem_list %}<li>{{ p }}</li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+  </div>
+  {% endfor %}
+</div>

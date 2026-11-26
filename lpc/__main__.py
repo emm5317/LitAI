@@ -44,10 +44,12 @@ def main() -> None:
     from .app import create_app
     from .backup import start_daily_backups
     from .config import load_settings
+    from .jobs import start_job_worker
 
     settings = load_settings()
     app = create_app(settings)          # applies any new migrations first
     start_daily_backups(settings.db_path, settings.backup_dir)
+    start_job_worker(settings.db_path, settings.matters_dir, app.state.job_signal)
 
     port = args.port or _free_port()
     url = f"http://127.0.0.1:{port}"

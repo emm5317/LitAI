@@ -70,3 +70,7 @@ mark { background: #f9eeda; padding: 0 1px; }
 .deadline .actions { align-items: flex-start; }
 .deadline .move form { margin: 6px 0 0; }
 .inline-form label.check { display: flex; align-items: center; gap: 4px; }
+.import { margin-bottom: 12px; }
+.import form { margin-top: 8px; }
+.job { padding: 8px 10px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 6px; background: #fbfaf8; }
+.job progress { width: 160px; vertical-align: middle; margin-left: 8px; }

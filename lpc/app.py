@@ -5,9 +5,10 @@ from __future__ import annotations
 import datetime as dt
 import shutil
 import sqlite3
-import tempfile
+import json
 import threading
-from pathlib import Path
+import uuid
+from pathlib import Path, PureWindowsPath
 from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
@@ -22,7 +23,8 @@ from . import __version__
 from .backup import list_backups
 from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
-from .ingest import ingest_file, search
+from .ingest import free_path, search
+from .jobs import enqueue
 from .matters import (
     EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
     conflicts_search, create_matter, get_matter, list_matters, log_change, matter_folder, matter_parties,
@@ -95,6 +97,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                   docs_url=None, redoc_url=None, openapi_url=None,
                   dependencies=[Depends(hold_db_lock)])
     app.state.db_lock = db_lock
+    app.state.job_signal = threading.Event()     # wakes the job worker started in __main__
 
     @app.middleware("http")
     async def local_only(request: Request, call_next):
@@ -215,6 +218,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "folder": matter_folder(m, settings.matters_dir),
             "parties": matter_parties(c, matter_id),
             "documents": matter_documents(matter_id),
+            **jobs_context(matter_id),
             "deadlines": live_deadlines(matter_id),
             "entries": entries_for(profile) if profile in load_rulesets() else [],
             "service_methods": SERVICE_METHODS,
@@ -270,15 +274,56 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post("/matters/{matter_id}/documents", response_class=HTMLResponse)
     async def upload(request: Request, matter_id: int, files: list[UploadFile] = File(...),
-                     doc_type: str = Form("other")):
+                     doc_type: str = Form("other"), source: str = Form("")):
+        """Save the uploads to a staging folder and queue them; the job worker does the slow part."""
+        matter_or_404(matter_id)
+        staging = settings.data_dir / "staging" / uuid.uuid4().hex
+        staging.mkdir(parents=True)
+        for up in files:
+            # Browsers send only the file name, but older ones sent the whole Windows path.
+            name = PureWindowsPath(up.filename or "upload").name or "upload"
+            with free_path(staging, name).open("wb") as fh:
+                shutil.copyfileobj(up.file, fh)
+        label = f"Upload of {len(files)} file{'s' if len(files) != 1 else ''}"
+        enqueue(db(), "ingest_files", matter_id, label, {"dir": str(staging), "doc_type": doc_type, "source": source})
+        app.state.job_signal.set()
+        return jobs_partial(request, matter_id)
+
+    @app.post("/matters/{matter_id}/import", response_class=HTMLResponse)
+    def import_folder(request: Request, matter_id: int, folder: str = Form(...), doc_type: str = Form("other"),
+                      source: str = Form("")):
+        """Copy a folder (with its subfolders) into the matter's 10 Source and index it."""
         m = matter_or_404(matter_id)
-        with tempfile.TemporaryDirectory() as tmp:
-            for up in files:
-                path = Path(tmp) / Path(up.filename or "upload").name
-                with path.open("wb") as fh:
-                    shutil.copyfileobj(up.file, fh)
-                ingest_file(db(), m, matter_folder(m, settings.matters_dir), path,
-                            doc_type=doc_type, source="internal")
+        source_dir = Path(folder.strip().strip('"').strip())      # Explorer's "Copy as path" adds quotes
+        if not folder.strip() or not source_dir.is_dir():
+            raise HTTPException(400, f"Could not find the folder {folder.strip()!r} on this computer.")
+        root = matter_folder(m, settings.matters_dir).resolve()
+        src = source_dir.resolve()
+        if src == root or root in src.parents:
+            raise HTTPException(400, "That folder is already inside this matter's folder. Use Rescan instead.")
+        if src in root.parents:
+            raise HTTPException(400, "That folder contains this matter's folder. Pick the folder you want to copy in.")
+        enqueue(db(), "import_folder", matter_id, f"Import of folder {src.name}",
+                {"folder": str(src), "doc_type": doc_type, "source": source})
+        app.state.job_signal.set()
+        return jobs_partial(request, matter_id)
+
+    @app.post("/matters/{matter_id}/rescan", response_class=HTMLResponse)
+    def rescan(request: Request, matter_id: int):
+        """Index files you put straight into the matter folder (in Explorer or OneDrive)."""
+        matter_or_404(matter_id)
+        enqueue(db(), "rescan_matter", matter_id, "Rescan of the matter folder", {})
+        app.state.job_signal.set()
+        return jobs_partial(request, matter_id)
+
+    @app.get("/matters/{matter_id}/jobs", response_class=HTMLResponse)
+    def jobs_view(request: Request, matter_id: int, polling: int = 0):
+        matter_or_404(matter_id)
+        return jobs_partial(request, matter_id, polling=bool(polling))
+
+    @app.get("/matters/{matter_id}/documents", response_class=HTMLResponse)
+    def documents_view(request: Request, matter_id: int):
+        matter_or_404(matter_id)
         return templates.TemplateResponse(request, "partials/documents.html", {"documents": matter_documents(matter_id)})
 
     @app.get("/search", response_class=HTMLResponse)
@@ -375,6 +420,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         log_change(db(), row["matter_id"], "deadlines", deadline_id, f"Deadline {status}: {row['title']}")
         db().commit()
         return _deadlines_partial(request, row["matter_id"])
+
+    def jobs_partial(request: Request, matter_id: int, polling: bool = False):
+        """Running jobs plus those finished in the last hour. While any are running the panel
+        polls itself; when the last one finishes it tells the document list to refresh."""
+        context = jobs_context(matter_id)
+        headers = {"HX-Trigger": "documents-changed"} if polling and not context["active"] else None
+        return templates.TemplateResponse(request, "partials/jobs.html", context, headers=headers)
+
+    def jobs_context(matter_id: int) -> dict:
+        rows = db().execute(
+            "SELECT * FROM jobs WHERE matter_id = ? AND (status IN ('queued', 'running')"
+            " OR finished_at >= strftime('%Y-%m-%dT%H:%M:%SZ', 'now', '-1 hour')) ORDER BY id DESC LIMIT 5",
+            (matter_id,)).fetchall()
+        jobs = [dict(r, problem_list=json.loads(r["problems"] or "[]")) for r in rows]
+        return {"jobs": jobs, "active": any(j["status"] in ("queued", "running") for j in jobs),
+                "matter_id": matter_id}
 
     def matter_documents(matter_id: int) -> list[sqlite3.Row]:
         """Newest first, with each email's attachments listed right under it."""

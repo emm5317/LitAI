@@ -74,15 +74,31 @@
 <section class="grid-2">
   <div class="card">
     <h2>Documents</h2>
-    <form class="inline-form" hx-post="/matters/{{ m.id }}/documents" hx-target="#documents" hx-encoding="multipart/form-data">
+    {% set source_choices = [('', 'Source (optional)'), ('client', 'From client'), ('opposing', 'From opposing party'), ('court', 'From the court'), ('third_party', 'From a third party'), ('internal', 'Ours (internal)'), ('public', 'Public record')] %}
+    {% set type_choices = ['other','complaint','answer','motion','brief','order','correspondence','email','discovery_request','discovery_response','production','transcript','exhibit','declaration','contract','policy','payroll_data','time_data'] %}
+    <form class="inline-form" hx-post="/matters/{{ m.id }}/documents" hx-target="#jobs" hx-swap="outerHTML" hx-encoding="multipart/form-data"
+          hx-on::after-request="if (event.detail.successful) this.reset()">
       <input type="file" name="files" multiple required>
-      <select name="doc_type">
-        {% for t in ['complaint','answer','motion','brief','order','correspondence','discovery_request','discovery_response','production','transcript','exhibit','contract','policy','payroll_data','other'] %}
-        <option value="{{ t }}" {{ 'selected' if t == 'other' }}>{{ t|replace('_', ' ') }}</option>{% endfor %}
-      </select>
+      <select name="doc_type">{% for t in type_choices %}<option value="{{ t }}">{{ t|replace('_', ' ') }}</option>{% endfor %}</select>
+      <select name="source">{% for v, label in source_choices %}<option value="{{ v }}">{{ label }}</option>{% endfor %}</select>
       <button type="submit">Add to matter</button>
     </form>
-    <div id="documents">{% include "partials/documents.html" %}</div>
+    <details class="import">
+      <summary>Import a whole folder, or pick up files added in Explorer</summary>
+      <form class="inline-form" hx-post="/matters/{{ m.id }}/import" hx-target="#jobs" hx-swap="outerHTML"
+            hx-on::after-request="if (event.detail.successful) this.reset()">
+        <input name="folder" required size="44" placeholder="Folder path, e.g. C:\Users\me\Downloads\Client docs">
+        <select name="doc_type">{% for t in type_choices %}<option value="{{ t }}">{{ t|replace('_', ' ') }}</option>{% endfor %}</select>
+        <select name="source">{% for v, label in source_choices %}<option value="{{ v }}">{{ label }}</option>{% endfor %}</select>
+        <button type="submit">Import folder</button>
+      </form>
+      <p class="muted small">The folder and its subfolders are copied into <em>10 Source</em>; files already in the matter are skipped.
+        In Explorer, Shift + right-click a folder and choose "Copy as path".</p>
+      <button type="button" hx-post="/matters/{{ m.id }}/rescan" hx-target="#jobs" hx-swap="outerHTML">Rescan matter folder</button>
+      <span class="muted small">Indexes files you saved straight into {{ folder }}.</span>
+    </details>
+    {% include "partials/jobs.html" %}
+    <div id="documents" hx-get="/matters/{{ m.id }}/documents" hx-trigger="documents-changed from:body">{% include "partials/documents.html" %}</div>
   </div>
 
   <div class="card">

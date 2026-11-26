@@ -42,7 +42,7 @@ def _existing(conn: sqlite3.Connection, matter_id: int, digest: str) -> int | No
     return row["id"] if row else None
 
 
-def _free_path(folder: Path, name: str) -> Path:
+def free_path(folder: Path, name: str) -> Path:
     """folder/name, or folder/name (1), (2)... if that file already exists."""
     dest = folder / name
     stem, suffix = Path(name).stem, Path(name).suffix
@@ -72,7 +72,7 @@ def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path
     except ValueError:
         dest_dir = matter_root / subfolder
         dest_dir.mkdir(parents=True, exist_ok=True)
-        dest = _free_path(dest_dir, src.name)
+        dest = free_path(dest_dir, src.name)
         shutil.copy2(src, dest)
         rel = dest.relative_to(matter_root)
 
@@ -113,7 +113,7 @@ def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path
             if _existing(conn, matter["id"], hashlib.sha256(data).hexdigest()):
                 continue                       # already in the matter; do not write a second copy
             folder.mkdir(parents=True, exist_ok=True)
-            path = _free_path(folder, safe_name(Path(name).name) or "attachment")
+            path = free_path(folder, safe_name(Path(name).name) or "attachment")
             path.write_bytes(data)
             ingest_file(conn, matter, matter_root, path, source=source, parent_id=doc_id, _depth=_depth + 1)
     return Ingested(doc_id, True)
