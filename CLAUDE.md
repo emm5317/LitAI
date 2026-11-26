@@ -28,6 +28,7 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | `lpc/chronology.py` | events: partial dates, people, issues, source pin; proposed (AI) vs accepted |
 | `lpc/exports.py` | chronology -> Word table / witness outline (python-docx), Excel (openpyxl), CSV |
 | `lpc/transcripts.py` | transcript PDFs -> page:line (by word position; full-size and condensed); cites |
+| `lpc/discovery.py` | discovery sets, auto-proposed response deadlines (ruleset `discovery:` map), limits, chase list |
 | `lpc/workbook.py` | Key Events workbook: blank template, header mapping, preview + import |
 | `lpc/ai/events.py` | AI-suggested events: prompt, chunking, verbatim quote check, stored as proposed |
 | `lpc/ai/gateway.py` | the ONLY path to a model (consent check, ZDR model block, audit log) |
@@ -36,7 +37,7 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | `lpc/migrations/NNN_*.sql` | schema; applied in order by `lpc/db.py` |
 | `lpc/rules/engine.py` | deadline math; `compute(entry_id, trigger, service_method, profile)` |
 | `lpc/rules/holidays.py` | federal + Illinois calendars; `data/closures.yaml` for one-offs |
-| `lpc/rules/data/rulesets/*.yaml` | one file per forum; `base:` inheritance (ndil -> frcp, federal_statutes) |
+| `lpc/rules/data/rulesets/*.yaml` | one file per forum; `base:` inheritance (ndil -> frcp, federal_statutes); `discovery:` and `limits:` too |
 | `lpc/rules/sources.json` | official source + version note per ruleset |
 | `docs/SCHEMA.md` | workbook tab -> table map |
 
@@ -101,9 +102,12 @@ M2 items 1-4 done: chronology page, "+ chronology" from hits/pages, exports save
 text; `proposed` until accepted; no server-side fallbacks under ZDR). M2 done: transcript
 page:line (migration 006; checked on two public court-filed transcripts, condensed layout only on a
 synthetic sheet) and the Key Events workbook (own template, columns in `lpc/workbook.py`;
-import shows a preview, then saves events as accepted with origin 'import'). Then ->
-M3 discovery tracking (sets, auto-proposed response deadlines from ruleset data, limits) ->
-M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
+import shows a preview, then saves events as accepted with origin 'import'). Clean transcript
+snippets; friendly dates (`nice_date`/`countdown`/`due_class` filters). M3 done: Discovery page,
+response deadlines proposed from ruleset `discovery:` maps (hard for received sets, soft reminders
+for served sets; confirmed deadlines never changed), `limits:` counters (FRCP 33(a)(1), Ill. S. Ct.
+R. 213(c), 216(f); unverified), dashboard "Discovery to chase", migration 007 (passed soft reminders
+leave next-deadline). Then -> M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
 Later: ECF/NEF parser; email via **Outlook/Graph first** (the practice uses Microsoft 365),
 Gmail after; research + cite checks; drafting; settlement analytics.
 Approved dependencies: `extract-msg`, `python-docx`, `openpyxl`.

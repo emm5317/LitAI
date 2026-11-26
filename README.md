@@ -42,9 +42,17 @@ Turn on BitLocker (or Device Encryption) before putting real client files here.
   folder tree is created automatically.
 - **Edit a matter** (status, phase, judge, case number, AI consent...); every change is logged.
 - **Deadlines**: pick a rule, enter the trigger date and service method, and the engine
-  proposes a date with its arithmetic shown. Nothing is calendared until you confirm it.
+  proposes a date with its arithmetic shown. Dates read "Fri Dec 4, 2026 · in 8 days"; those due
+  within a week are marked, overdue ones are red. Nothing is calendared until you confirm it.
   Court-order and stipulated deadlines can be entered by hand, and any open deadline can be
   moved to a new date with a reason; the old date is kept in its history.
+- **Discovery**: each matter's sets served and received, with status (open, responded,
+  deficient, meet and confer, motion, resolved) and the request/response documents. A set with a
+  service date gets its response deadline proposed from the rules (FRCP 33/34/36; Ill. S. Ct. R.
+  213/214/216): a hard deadline for sets you received, a reminder for sets you served. Limit
+  counters (25 interrogatories under FRCP 33(a)(1), 30 under Ill. S. Ct. R. 213(c) and 216(f))
+  warn when a party goes over. The dashboard lists discovery to chase: answers owed to you that
+  are overdue, and sets stuck in deficiency, meet-and-confer or motion practice.
 - **Documents**: add files, **import a whole folder** (paste its path), or **rescan** the matter
   folder to pick up files saved there in Explorer. Work runs in the background with a progress
   panel. PDFs, Word (.docx), emails (.eml and Outlook .msg) and text files are indexed page by
