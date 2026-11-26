@@ -17,6 +17,7 @@ from collections.abc import Callable
 
 from ..chronology import SIGNIFICANCE, EventError, parse_event_date
 from ..matters import log_change, normalize_name
+from ..transcripts import lines_on, normalize_quote, quote_cite
 from .gateway import AIRequest, complete
 
 PROMPT_VERSION = "1"
@@ -44,15 +45,6 @@ Reply with only a JSON array and no other text:
 [{"date": "2026-03-03", "approximate": false, "description": "...", "people": ["..."], "page": 2, \
 "quote": "...", "significance": "supporting"}]
 Reply [] if the pages describe no events."""
-
-
-def normalize(text: str) -> str:
-    """For quote matching: rejoin words hyphenated across lines, unify quote marks and dashes,
-    collapse whitespace, ignore case."""
-    text = re.sub(r"(\w)-\s*\n\s*(\w)", r"\1\2", text)
-    text = text.translate(str.maketrans({"‘": "'", "’": "'", "“": '"', "”": '"',
-                                         "–": "-", "—": "-", "­": None, " ": " "}))
-    return re.sub(r"\s+", " ", text).strip().casefold()
 
 
 def chunks(pages: list[tuple[int, str]], limit: int = CHUNK_CHARS) -> list[list[tuple[int, str]]]:
@@ -117,8 +109,17 @@ def suggest_events(conn: sqlite3.Connection, document_id: int, *, client=None,
     pages = pages[:MAX_PAGES]
     parties = conn.execute("SELECT mp.id, p.name FROM matter_parties mp JOIN parties p ON p.id = mp.party_id"
                            " WHERE mp.matter_id = ?", (doc["matter_id"],)).fetchall()
-    known = {normalize(r["quote"]) for r in conn.execute(
+    known = {normalize_quote(r["quote"]) for r in conn.execute(
         "SELECT quote FROM events WHERE source_document_id = ? AND quote IS NOT NULL", (document_id,))}
+    # A transcript's page text has the margin line numbers mixed in ("...resources on 3 March 3..."),
+    # which would break any quote running across two lines. Use the transcript's own line text.
+    by_pdf_page: dict[int, list[str]] = {}
+    for r in conn.execute("SELECT pdf_page, text FROM transcript_lines WHERE document_id = ? ORDER BY rowid",
+                          (document_id,)):
+        by_pdf_page.setdefault(r["pdf_page"], []).append(r["text"])
+    transcript = bool(by_pdf_page)
+    if transcript:
+        pages = [(no, "\n".join(by_pdf_page[no]) if no in by_pdf_page else text) for no, text in pages]
     groups = chunks(pages)
     proposed = dropped = repeats = 0
     problems: list[str] = []
@@ -139,10 +140,10 @@ def suggest_events(conn: sqlite3.Connection, document_id: int, *, client=None,
             problems.append(f"{span}: could not read the model's reply ({exc})"
                             + (" - it was cut off; the pages may be too dense" if req.stop_reason == "max_tokens" else ""))
             items = []
-        texts = {no: normalize(text) for no, text in group}
+        texts = {no: normalize_quote(text) for no, text in group}
         for item in items:
             quote = str(item.get("quote") or "").strip()
-            q = normalize(quote)
+            q = normalize_quote(quote)
             page = item.get("page") if isinstance(item.get("page"), int) else None
             if len(q) < 8 or not str(item.get("description") or "").strip():
                 dropped += 1
@@ -156,6 +157,9 @@ def suggest_events(conn: sqlite3.Connection, document_id: int, *, client=None,
                 repeats += 1
                 continue
             known.add(q)
+            pin = f"p. {page}"
+            if transcript:     # a transcript: cite page:line (the quote may run onto the next sheet)
+                pin = quote_cite(lines_on(conn, document_id, [page, page + 1]), quote) or pin
             try:
                 date, precision = parse_event_date(str(item.get("date") or ""), bool(item.get("approximate")))
             except EventError:
@@ -169,7 +173,7 @@ def suggest_events(conn: sqlite3.Connection, document_id: int, *, client=None,
                 " source_document_id, pin, notes, status, origin, quote, ai_call_id)"
                 " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', 'ai', ?, ?)",
                 (doc["matter_id"], f"P-{(code_row[0] or 0) + 1:03d}", date, precision,
-                 str(item["description"]).strip()[:1000], significance, document_id, f"p. {page}",
+                 str(item["description"]).strip()[:1000], significance, document_id, pin,
                  f"Also named: {', '.join(unmatched)}" if unmatched else None, quote, req.call_id))
             conn.executemany("INSERT OR IGNORE INTO event_people (event_id, matter_party_id) VALUES (?, ?)",
                              [(cur.lastrowid, p) for p in dict.fromkeys(people)])

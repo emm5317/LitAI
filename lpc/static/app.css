@@ -102,3 +102,8 @@ a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--lin
 .suggestion .actions form { margin: 0; }
 blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--line); color: #444; font-size: 13px; }
 button[disabled] { opacity: .5; cursor: not-allowed; }
+.tlines { font-family: "Cascadia Mono", Consolas, monospace; font-size: 12.5px; line-height: 1.6; }
+.tline { display: flex; gap: 10px; }
+.tline .lno { width: 2em; text-align: right; color: var(--muted); user-select: none; flex: none; }
+.tline:target { background: #fff3cd; }
+.page.transcript.current h3 { color: var(--accent); }

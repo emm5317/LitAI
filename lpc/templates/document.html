@@ -1,18 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ d.title }} · {{ m.short_name }}<script>
-  // "+ chronology" on a page: carry over any text selected on that page.
-  document.querySelectorAll("a.add-event").forEach(function (link) {
-    link.addEventListener("click", function (e) {
-      var selected = String(window.getSelection() || "").trim();
-      if (!selected) return;
-      e.preventDefault();
-      var url = new URL(link.href);
-      url.searchParams.set("text", selected.slice(0, 2000));
-      window.location = url.toString();
-    });
-  });
-</script>
-{% endblock %}
+{% block title %}{{ d.title }} · {{ m.short_name }}{% endblock %}
 {% block content %}
 {% set is_pdf = d.file_path.lower().endswith('.pdf') %}
 <section class="matter-head">
@@ -36,6 +23,9 @@
   {% else %}
   <button disabled title="AI is off for this matter. Turn on client consent under Edit matter.">Suggest events (AI)</button>
   {% endif %}
+  {% if is_pdf and not transcript_pages and d.text_status == 'extracted' %}
+  <button hx-post="/documents/{{ d.id }}/transcript" hx-swap="none" title="For a deposition transcript added earlier: read its page and line numbers">Read as transcript</button>
+  {% endif %}
   <button hx-post="/documents/{{ d.id }}/open" hx-swap="none">Open in its program</button>
   <button hx-post="/documents/{{ d.id }}/reveal" hx-swap="none">Show in folder</button>
   <span class="muted small">{{ d.file_path }}</span>
@@ -47,6 +37,19 @@
     {% if d.notes and d.text_status == 'failed' %}<p class="warn">{{ d.notes }}</p>{% endif %}
     {% if not pages %}<p class="muted">No text was extracted from this file.</p>{% endif %}
     {% if start > 1 %}<p><a href="/documents/{{ d.id }}?page={{ [start - pages_shown, 1]|max }}&q={{ q|urlencode }}">&larr; Earlier pages</a></p>{% endif %}
+    {% if transcript_pages %}
+    {% for t in transcript_pages %}
+    <section class="page transcript {{ 'current' if t.page == tp }}" id="t-{{ t.page }}">
+      <h3>Page {{ t.page }}{% if is_pdf %} <a class="small" href="/documents/{{ d.id }}/file#page={{ t.pdf_page }}" target="_blank">view</a>{% endif %}
+        <a class="small add-event" data-page="{{ t.page }}" href="/matters/{{ m.id }}/chronology?doc={{ d.id }}&pin={{ (t.page ~ ':1')|urlencode }}#add"
+           title="Select lines first: the pin becomes their page:line span and the text is copied">+ chronology</a></h3>
+      <div class="tlines">
+        {% for ln in t.lines %}<div class="tline" id="t-{{ t.page }}-{{ ln.line }}" data-cite="{{ t.page }}:{{ ln.line }}"><span class="lno">{{ ln.line }}</span><span class="ltext">{{ ln.text|highlight }}</span></div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+    {% else %}
     {% for no, text in pages %}
     <section class="page {{ 'current' if no == page }}" id="p-{{ no }}">
       <h3>Page {{ no }}{% if is_pdf %} <a class="small" href="/documents/{{ d.id }}/file#page={{ no }}" target="_blank">view</a>{% endif %}
@@ -55,6 +58,7 @@
       <div class="page-text">{{ text|highlight }}</div>
     </section>
     {% endfor %}
+    {% endif %}
     {% if more %}<p><a href="/documents/{{ d.id }}?page={{ start + pages_shown + 5 }}&q={{ q|urlencode }}#p-{{ start + pages_shown }}">Later pages &rarr;</a></p>{% endif %}
   </div>
 
@@ -92,13 +96,31 @@
   </div>
 </section>
 <script>
-  // "+ chronology" on a page: carry over any text selected on that page.
+  // "+ chronology" on a page carries over any selected text. On a transcript, the pin becomes the
+  // page:line span of the selected lines (45:3-7, or 45:24-46:2 across pages).
+  function lineOf(node) {
+    var el = node && (node.nodeType === 1 ? node : node.parentElement);
+    return el && el.closest(".tline");
+  }
+  function span(a, b) {
+    var x = a.split(":"), y = b.split(":");
+    if (a === b) return a;
+    return x[0] === y[0] ? a + "-" + y[1] : a + "-" + b;
+  }
   document.querySelectorAll("a.add-event").forEach(function (link) {
     link.addEventListener("click", function (e) {
-      var selected = String(window.getSelection() || "").trim();
+      var sel = window.getSelection();
+      var selected = String(sel || "").trim();
       if (!selected) return;
       e.preventDefault();
       var url = new URL(link.href);
+      var first = lineOf(sel.anchorNode), last = lineOf(sel.focusNode);
+      if (first && last) {
+        var a = first.dataset.cite, b = last.dataset.cite;
+        if (first.compareDocumentPosition(last) & Node.DOCUMENT_POSITION_PRECEDING) { var t = a; a = b; b = t; }
+        url.searchParams.set("pin", span(a, b));
+        selected = selected.replace(/^\s*\d+\s+/gm, "");      // drop line numbers picked up with the text
+      }
       url.searchParams.set("text", selected.slice(0, 2000));
       window.location = url.toString();
     });

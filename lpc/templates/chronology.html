@@ -18,7 +18,7 @@
     <div><span class="date">{{ e|event_date }}</span> {{ e.description }}
       {% if e.significance == 'key' %}<span class="tag tag-ok">key</span>{% endif %}
       {% if e.people %}<span class="muted small">· {{ e.people }}</span>{% endif %}</div>
-    <blockquote>"{{ e.quote }}" <a class="small" href="/documents/{{ e.source_document_id }}?page={{ e.pin|pin_page }}&q={{ e.quote|truncate(60, true, '')|urlencode }}#p-{{ e.pin|pin_page }}">{{ e.source_title }}, {{ e.pin }}</a></blockquote>
+    <blockquote>"{{ e.quote }}" <a class="small" href="{{ source_href(e.source_document_id, e.pin, e.source_is_transcript) }}">{{ e.source_title }}, {{ e.pin }}</a></blockquote>
     {% if e.notes %}<p class="muted small">{{ e.notes }}</p>{% endif %}
     <div class="actions">
       <form method="post" action="/events/{{ e.id }}/accept"><button type="submit">Accept</button></form>
@@ -73,7 +73,7 @@
           {% if e.issue_tags %}<br><span class="muted small">{{ e.issue_tags }}</span>{% endif %}
           {% if e.notes %}<br><span class="muted small">{{ e.notes }}</span>{% endif %}</td>
         <td class="small">{{ e.people or '' }}</td>
-        <td class="small">{% if e.source_document_id %}<a href="/documents/{{ e.source_document_id }}{% if e.pin|pin_page %}?page={{ e.pin|pin_page }}#p-{{ e.pin|pin_page }}{% endif %}">{{ e.source_title }}</a>{% if e.pin %}, {{ e.pin }}{% endif %}{% elif e.pin %}{{ e.pin }}{% endif %}</td>
+        <td class="small">{% if e.source_document_id %}<a href="{{ source_href(e.source_document_id, e.pin, e.source_is_transcript) }}">{{ e.source_title }}</a>{% if e.pin %}, {{ e.pin }}{% endif %}{% elif e.pin %}{{ e.pin }}{% endif %}</td>
         <td><a class="small" href="/events/{{ e.id }}/edit">Edit</a></td>
       </tr>
     {% endfor %}

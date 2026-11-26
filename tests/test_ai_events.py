@@ -4,13 +4,14 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from lpc.ai.events import chunks, normalize, parse_reply, suggest_events
+from lpc.ai.events import chunks, parse_reply, suggest_events
 from lpc.ai.gateway import GatewayBlocked
 from lpc.app import create_app
 from lpc.chronology import chronology
 from lpc.ingest import ingest_file
 from lpc.jobs import run_pending
 from lpc.matters import add_party_to_matter, create_matter, get_matter, matter_folder
+from lpc.transcripts import normalize_quote
 
 PAGES = [
     "Offer letter. Jane Doe will start as a warehouse associate on January 6, 2025.",
@@ -74,7 +75,7 @@ def doc(conn, settings, tmp_path, monkeypatch):
 
 
 def test_helpers():
-    assert normalize("“Smart” quotes — and  em dash, re-\nhyphen") == '"smart" quotes - and em dash, rehyphen'
+    assert normalize_quote("“Smart” quotes — and  em dash, re-\nhyphen") == '"smart" quotes - and em dash, rehyphen'
     assert parse_reply('Here you go:\n```json\n[{"a": 1}, 2]\n```') == [{"a": 1}]
     with pytest.raises(ValueError):
         parse_reply("Sorry, I cannot help with that.")

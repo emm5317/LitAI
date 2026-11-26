@@ -7,6 +7,7 @@ import shutil
 import sqlite3
 import json
 import mimetypes
+import re
 import os
 import subprocess
 import sys
@@ -32,13 +33,14 @@ from .chronology import (
 from .config import PACKAGE_DIR, Settings, load_settings
 from .exports import chronology_csv, chronology_docx, chronology_xlsx, export_name, witness_outline_docx
 from .db import open_database
-from .ingest import DOC_FIELDS, _fts_query, free_path, search, search_titles, update_document
+from .ingest import DOC_FIELDS, _fts_query, free_path, read_as_transcript, search, search_titles, update_document
 from .jobs import enqueue
 from .matters import (
     EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
     conflicts_search, create_matter, get_matter, list_matters, log_change, matter_folder, matter_parties,
     record_conflict_check, update_matter,
 )
+from .transcripts import cite, is_transcript, line_for_terms, lines_on, pdf_page_for
 from .rules.engine import SERVICE_METHODS, compute, entries_for, load_rulesets
 
 PROFILE_BY_FORUM = {
@@ -69,6 +71,36 @@ DOC_TYPES = ("complaint", "answer", "pleading", "motion", "brief", "order", "jud
              "discovery_request", "discovery_response", "production", "transcript", "exhibit", "declaration",
              "contract", "policy", "payroll_data", "time_data", "research", "work_product", "demand", "award", "other")
 DOC_SOURCES = ("client", "opposing", "court", "third_party", "internal", "email", "public")
+
+
+def plain_terms(q: str) -> list[str]:
+    """The words of a search, without OR, excluded words or quote marks (for marking and cites)."""
+    terms = []
+    for token in re.findall(r'"[^"]*"|\S+', q):
+        if token == "OR" or token.startswith("-"):
+            continue
+        terms += [word.strip('"*') for word in token.strip('"').split()]
+    return [t for t in terms if t]
+
+
+def mark_terms(text: str, terms: list[str]) -> str:
+    """Wrap words that start with a search term in \x02...\x03 (the highlight filter escapes the text,
+    then turns those markers into <mark>)."""
+    stems = [re.escape(t.casefold()[:max(4, len(t) - 2)]) for t in terms if t]
+    if not stems:
+        return text
+    return re.sub(r"\b(?:" + "|".join(stems) + r")\w*", lambda m: f"\x02{m.group()}\x03", text, flags=re.IGNORECASE)
+
+
+def source_href(doc_id: int | None, pin: str | None, transcript: bool = False) -> str:
+    """Link from a chronology event to the cited spot: a transcript line for 45:3, else a PDF page."""
+    if not doc_id:
+        return ""
+    match = re.match(r"\s*(\d+):(\d+)", pin or "")
+    if transcript and match:
+        return f"/documents/{doc_id}?tp={match[1]}#t-{match[1]}-{match[2]}"
+    page = pin_page(pin)
+    return f"/documents/{doc_id}" + (f"?page={page}#p-{page}" if page else "")
 
 
 def open_in_os(path: Path, reveal: bool = False) -> None:
@@ -149,6 +181,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     templates.env.filters["highlight"] = highlight
     templates.env.filters["event_date"] = lambda e: format_event_date(e["event_date"], e["date_precision"])
     templates.env.filters["pin_page"] = pin_page
+    templates.env.globals["source_href"] = source_href
     templates.env.globals["version"] = __version__
 
     def db() -> sqlite3.Connection:
@@ -382,8 +415,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return path
 
     @app.get("/documents/{doc_id}", response_class=HTMLResponse)
-    def document_detail(request: Request, doc_id: int, page: int = 1, q: str = ""):
+    def document_detail(request: Request, doc_id: int, page: int = 1, q: str = "", tp: int | None = None):
+        """tp opens a transcript at a transcript page (a condensed transcript has four per PDF page)."""
         d = document_or_404(doc_id)
+        transcript = is_transcript(db(), doc_id)
+        if transcript and tp:
+            page = pdf_page_for(db(), doc_id, tp) or page
         start = max(1, page - 5)
         pages = db().execute("SELECT page_no, text FROM document_pages WHERE document_id = ? AND page_no >= ?"
                              " ORDER BY page_no LIMIT ?", (doc_id, start, PAGES_SHOWN)).fetchall()
@@ -397,7 +434,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 " WHERE document_pages_fts MATCH ? AND dp.document_id = ? AND dp.page_no BETWEEN ? AND ?",
                     (query, doc_id, min(texts), max(texts))):
                 texts[r["page_no"]] = r["text"]
+        transcript_pages: list[dict] = []
+        if transcript:
+            terms = plain_terms(q)
+            for ln in lines_on(db(), doc_id, list(range(start, start + PAGES_SHOWN))):
+                if not transcript_pages or transcript_pages[-1]["page"] != ln["page"]:
+                    transcript_pages.append({"page": ln["page"], "pdf_page": ln["pdf_page"], "lines": []})
+                transcript_pages[-1]["lines"].append({"line": ln["line"], "text": mark_terms(ln["text"], terms)})
         return templates.TemplateResponse(request, "document.html", {
+            "transcript_pages": transcript_pages, "tp": tp,
             "d": d, "m": get_matter(db(), d["matter_id"]), "pages": sorted(texts.items()), "page": page, "q": q,
             "start": start, "more": d["page_count"] and start + PAGES_SHOWN <= d["page_count"],
             "parent": db().execute("SELECT id, title FROM documents WHERE id = ?", (d["parent_id"],)).fetchone()
@@ -413,6 +458,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         path = document_path(document_or_404(doc_id))
         media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
+
+    @app.post("/documents/{doc_id}/transcript", response_class=HTMLResponse)
+    def document_read_transcript(request: Request, doc_id: int):
+        """Read page:line numbers from a PDF added before transcripts were recognized (or re-read one)."""
+        d = document_or_404(doc_id)
+        path = document_path(d)
+        if path.suffix.lower() != ".pdf":
+            raise HTTPException(400, "Only PDF transcripts can be read for page and line numbers.")
+        found = read_as_transcript(db(), doc_id, path)
+        if not found:
+            raise HTTPException(400, "No numbered transcript pages were found in this PDF.")
+        log_change(db(), d["matter_id"], "documents", doc_id, f"Read {d['title']} as a transcript ({found} pages)")
+        db().commit()
+        return show_notice(request, f"Read {plural(found, 'transcript page')}. Reload to see page and line numbers.")
 
     @app.post("/documents/{doc_id}/open")
     def document_open(doc_id: int):
@@ -642,8 +701,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 parse_date(value, label)
         filters = {"doc_type": doc_type or None, "source": source or None, "date_from": date_from or None,
                    "date_to": date_to or None, "key_only": bool(key_only)}
-        hits = search(db(), q, matter_id, **filters) if q.strip() else []
+        hits = [dict(h) for h in search(db(), q, matter_id, **filters)] if q.strip() else []
         titles = search_titles(db(), q, matter_id, **filters) if q.strip() else []
+        terms = plain_terms(q)
+        for h in hits:                          # transcripts: which line the hit is on
+            h["cite"] = None
+            if is_transcript(db(), h["document_id"]):
+                found = line_for_terms(lines_on(db(), h["document_id"], [h["page_no"]]), terms)
+                h["cite"] = cite(found, found) if found else None
         return templates.TemplateResponse(request, "partials/search_results.html",
                                           {"hits": hits, "titles": titles, "q": q})
 

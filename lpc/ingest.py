@@ -105,6 +105,8 @@ def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path
         "INSERT INTO document_pages (document_id, page_no, text) VALUES (?, ?, ?)",
         [(doc_id, i, text) for i, text in enumerate(ex.pages, start=1) if text.strip()],
     )
+    if dest.suffix.lower() == ".pdf" and text_status == "extracted":
+        read_as_transcript(conn, doc_id, dest)
     log_change(conn, matter["id"], "documents", doc_id, f"Added document {title}", actor="system")
     conn.commit()
 
@@ -118,6 +120,22 @@ def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path
             path.write_bytes(data)
             ingest_file(conn, matter, matter_root, path, source=source, parent_id=doc_id, _depth=_depth + 1)
     return Ingested(doc_id, True)
+
+
+def read_as_transcript(conn: sqlite3.Connection, doc_id: int, path: Path) -> int:
+    """If the PDF is a deposition transcript, store its page:line numbers (and call it a transcript
+    if its type was 'other'). Returns the number of transcript pages found. Does not commit."""
+    from .transcripts import parse_transcript, store_transcript
+
+    try:
+        lines = parse_transcript(path)
+    except Exception:          # an odd PDF should never stop the document being added
+        return 0
+    if not lines:
+        return 0
+    store_transcript(conn, doc_id, lines)
+    conn.execute("UPDATE documents SET doc_type = 'transcript' WHERE id = ? AND doc_type = 'other'", (doc_id,))
+    return len({ln.page for ln in lines})
 
 
 DOC_FIELDS = ("title", "doc_type", "doc_date", "author", "recipients", "bates_begin", "bates_end", "docket_no",

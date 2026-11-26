@@ -145,6 +145,7 @@ def chronology(conn: sqlite3.Connection, matter_id: int, *, person: int | None =
     AI suggestions awaiting review are left out unless status='proposed'."""
     sql = (
         "SELECT e.*, d.title AS source_title, d.file_path AS source_path, d.bates_begin AS source_bates,"
+        " EXISTS (SELECT 1 FROM transcript_lines t WHERE t.document_id = e.source_document_id) AS source_is_transcript,"
         " (SELECT group_concat(p.name, ', ') FROM event_people ep"
         "   JOIN matter_parties mp ON mp.id = ep.matter_party_id JOIN parties p ON p.id = mp.party_id"
         "   WHERE ep.event_id = e.id) AS people"
