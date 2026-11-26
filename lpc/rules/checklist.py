@@ -38,6 +38,13 @@ def render() -> str:
         if rs.base:
             lines.append(f"Inherits: {', '.join(rs.base)}.")
         lines.append("")
+        if rs.limits:
+            lines.append("| ✓ | Limit | Citation | Count | Note |")
+            lines.append("| --- | --- | --- | --- | --- |")
+            for set_type, limit in rs.limits.items():
+                mark = "x" if limit.get("verified") else " "
+                lines.append(f"| [{mark}] | {set_type} | {limit['cite']} | {limit['count']} | {limit.get('note', '')} |")
+            lines.append("")
         if not rs.entries:
             lines.append("_No entries yet._")
             lines.append("")

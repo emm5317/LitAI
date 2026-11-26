@@ -11,6 +11,21 @@ service:
   completes_after: {mail: 4, electronic: 0, hand: 0}
 sources: [il_supreme_court_rules, ilcs]
 verified: false
+discovery:
+  interrogatories: il.interrogatory_answers
+  rfp: il.production_minimum
+  rfa: il.rfa_responses
+limits:
+  interrogatories:
+    count: 30
+    cite: Ill. S. Ct. R. 213(c)
+    note: Including sub-parts, unless the parties agree or the court allows more.
+    verified: false
+  rfa:
+    count: 30
+    cite: Ill. S. Ct. R. 216(f)
+    note: Including sub-parts, unless the parties agree or the court allows more.
+    verified: false
 entries:
   - id: il.appearance_answer
     title: Appearance and answer or motion

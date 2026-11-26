@@ -93,6 +93,10 @@ Counting: `frcp6a`. Holidays: federal.
 Source: [Federal Rules of Civil Procedure](https://www.uscourts.gov/rules-policies/current-rules-practice-procedure/federal-rules-civil-procedure). Amendments effective Dec. 1, 2025 (Rules 16, 16.1 new, 26). Next Civil Rules package (7.1, 26, 41, 45, 81) is on the Dec. 1, 2027 track. Download the current PDF from the landing page.
 Counting: `frcp6a`. Holidays: federal.
 
+| ✓ | Limit | Citation | Count | Note |
+| --- | --- | --- | --- | --- |
+| [ ] | interrogatories | Fed. R. Civ. P. 33(a)(1) | 25 | On any other party, including discrete subparts, unless stipulated or the court orders otherwise. |
+
 | ✓ | Entry | Citation | Period | Trigger |
 | --- | --- | --- | --- | --- |
 | [ ] | Serve summons and complaint | Fed. R. Civ. P. 4(m) | 90 days | complaint filed |
@@ -141,6 +145,11 @@ Counting: `frcp6a`. Holidays: federal.
 Source: [Illinois Supreme Court Rules](https://www.illinoiscourts.gov/rules/supreme-court-rules). Each rule has its own page/PDF with its amendment date. Save Rules 12, 181, 182, 213, 214, 216, 218, 303, 307 and 315 at minimum.
 Source: [Illinois Compiled Statutes (735 ILCS 5 Code of Civil Procedure; 5 ILCS 70/1.11; 205 ILCS 630/17)](https://www.ilga.gov/legislation/ilcs/ilcs.asp). Statute on Statutes 1.11 governs state-law time computation; 205 ILCS 630/17 lists Illinois holidays.
 Counting: `illinois`. Holidays: federal, illinois.
+
+| ✓ | Limit | Citation | Count | Note |
+| --- | --- | --- | --- | --- |
+| [ ] | interrogatories | Ill. S. Ct. R. 213(c) | 30 | Including sub-parts, unless the parties agree or the court allows more. |
+| [ ] | rfa | Ill. S. Ct. R. 216(f) | 30 | Including sub-parts, unless the parties agree or the court allows more. |
 
 | ✓ | Entry | Citation | Period | Trigger |
 | --- | --- | --- | --- | --- |

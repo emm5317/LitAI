@@ -14,6 +14,19 @@ service:
   add_days: {mail: 3, leave_with_clerk: 3, other_consented: 3, electronic: 0, hand: 0}
 sources: [frcp]
 verified: false
+# Which entry gives the response deadline for a discovery set of each type (used by the
+# Discovery page to propose the deadline). Subpoenas and deposition notices have no default.
+discovery:
+  interrogatories: frcp.interrogatory_responses
+  rfp: frcp.rfp_responses
+  rfa: frcp.rfa_responses
+# Numeric limits on requests, shown as counters on the Discovery page. Verify like entries.
+limits:
+  interrogatories:
+    count: 25
+    cite: Fed. R. Civ. P. 33(a)(1)
+    note: On any other party, including discrete subparts, unless stipulated or the court orders otherwise.
+    verified: false
 entries:
   # --- Pleadings --------------------------------------------------------------
   - id: frcp.serve_complaint

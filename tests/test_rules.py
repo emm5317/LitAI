@@ -79,3 +79,24 @@ def test_holiday_calendars_are_cached():
         holiday_name(D(2026, 11, 3), ["federal", "illinois"])
     assert federal_holidays.cache_info().misses == 1
     assert illinois_extra_holidays.cache_info().misses == 1
+
+
+def test_discovery_rules_and_limits_are_inherited():
+    from lpc.rules.engine import discovery_entry, discovery_limit
+
+    assert discovery_entry("ndil", "interrogatories").id == "frcp.interrogatory_responses"   # via frcp
+    assert discovery_entry("cook", "rfa").id == "il.rfa_responses"                          # via illinois
+    assert discovery_entry("ndil", "subpoena") is None
+    assert discovery_entry("aaa_employment", "rfp") is None                                 # set by the arbitrator
+    assert discovery_entry(None, "rfp") is None
+    limit = discovery_limit("ndil", "interrogatories")
+    assert limit["count"] == 25 and limit["cite"] == "Fed. R. Civ. P. 33(a)(1)" and limit["verified"] is False
+    assert discovery_limit("cook", "rfa")["count"] == 30 and discovery_limit("ndil", "rfa") is None
+
+
+def test_checklist_lists_limits():
+    from lpc.rules.checklist import render
+
+    text = render()
+    assert "| [ ] | interrogatories | Fed. R. Civ. P. 33(a)(1) | 25 |" in text
+    assert "| [ ] | rfa | Ill. S. Ct. R. 216(f) | 30 |" in text

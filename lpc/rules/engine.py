@@ -69,6 +69,8 @@ class Ruleset:
     entries: list[Entry]
     notes: str | None = None
     verified: bool = False
+    discovery: dict[str, str] = field(default_factory=dict)     # set type -> entry id for the response deadline
+    limits: dict[str, dict] = field(default_factory=dict)       # set type -> {count, cite, note, verified}
 
 
 @dataclass
@@ -106,6 +108,7 @@ def _parse(path: Path) -> Ruleset:
         service_completes_after=dict(svc.get("completes_after") or {}),
         sources=list(raw.get("sources") or []), base=list(raw.get("base") or []),
         entries=entries, notes=raw.get("notes"), verified=bool(raw.get("verified", False)),
+        discovery=dict(raw.get("discovery") or {}), limits=dict(raw.get("limits") or {}),
     )
 
 
@@ -131,6 +134,38 @@ def entries_for(ruleset_id: str) -> list[Entry]:
 
     walk(ruleset_id)
     return out
+
+
+def _lineage(ruleset_id: str) -> list[Ruleset]:
+    """The ruleset and everything it inherits, nearest first (same order as entries_for)."""
+    sets = load_rulesets()
+    out: list[Ruleset] = []
+
+    def walk(rid: str) -> None:
+        if rid in sets and sets[rid] not in out:
+            out.append(sets[rid])
+            for b in sets[rid].base:
+                walk(b)
+
+    walk(ruleset_id)
+    return out
+
+
+def discovery_entry(ruleset_id: str | None, set_type: str) -> Entry | None:
+    """The rule entry that gives the response deadline for a discovery set, or None if the
+    matter's rules have none for that kind of set (subpoenas, arbitration, no profile)."""
+    for rs in _lineage(ruleset_id or ""):
+        if set_type in rs.discovery:
+            return find_entry(rs.discovery[set_type])
+    return None
+
+
+def discovery_limit(ruleset_id: str | None, set_type: str) -> dict | None:
+    """{count, cite, note, verified, ruleset} for a numeric limit on requests, or None."""
+    for rs in _lineage(ruleset_id or ""):
+        if set_type in rs.limits:
+            return {**rs.limits[set_type], "ruleset": rs.id}
+    return None
 
 
 def find_entry(entry_id: str) -> Entry:
@@ -251,4 +286,11 @@ def validate() -> list[str]:
                 problems.append(f"{e.id}: period needs exactly one of days or months")
             if not e.cite or not e.title or not e.trigger:
                 problems.append(f"{e.id}: missing cite, title or trigger")
+    for rs in sets.values():
+        for set_type, entry_id in rs.discovery.items():
+            if entry_id not in ids:
+                problems.append(f"{rs.id}: discovery {set_type} names unknown entry {entry_id}")
+        for set_type, limit in rs.limits.items():
+            if not isinstance(limit.get("count"), int) or not limit.get("cite"):
+                problems.append(f"{rs.id}: limit {set_type} needs a whole-number count and a cite")
     return problems
