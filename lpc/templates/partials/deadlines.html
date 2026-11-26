@@ -1,9 +1,12 @@
 {% if deadlines %}
 <ul class="deadline-list">
   {% for d in deadlines %}
-  <li class="deadline status-{{ d.status }}">
+  {% set open = d.status in ('proposed', 'confirmed') %}
+  <li class="deadline status-{{ d.status }} {{ d.due_on|due_class if open }}">
     <div>
-      <span class="date">{{ d.due_on }}</span> <strong>{{ d.title }}</strong>
+      <span class="date" title="{{ d.due_on }}">{{ d.due_on|nice_date }}</span>
+      {% if open %}<span class="countdown">{{ d.due_on|countdown }}</span>{% endif %}
+      <strong>{{ d.title }}</strong>
       <span class="muted">{{ d.rule_cite or '' }}</span>
       {% if d.status == 'proposed' %}<span class="tag tag-warn">proposed</span>{% elif d.status == 'confirmed' %}<span class="tag tag-ok">confirmed</span>{% else %}<span class="tag">{{ d.status }}</span>{% endif %}
       {% if d.source != 'rules_engine' %}<span class="tag">{{ d.source|replace('_', ' ') }}</span>{% endif %}

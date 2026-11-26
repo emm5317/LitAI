@@ -260,3 +260,29 @@ def test_manual_deadlines_work_without_a_rules_profile(settings):
     r = client.post(f"/matters/{mid}/deadlines", data={"title": "EEOC position statement", "due_on": "2027-01-15",
                                                        "source": "manual"})
     assert "EEOC position statement" in r.text
+
+
+def test_friendly_dates():
+    import datetime as dt
+
+    from lpc.app import countdown, due_class, nice_date
+
+    today = dt.date(2026, 11, 26)
+    assert nice_date("2026-12-04") == "Fri Dec 4, 2026" and nice_date("") == "" and nice_date("soon") == "soon"
+    assert [countdown(d, today) for d in ("2026-11-26", "2026-11-27", "2026-12-04", "2026-11-25", "2026-11-20")] == [
+        "today", "tomorrow", "in 8 days", "yesterday", "6 days ago"]
+    assert [due_class(d, today) for d in ("2026-11-20", "2026-12-03", "2026-12-04")] == ["overdue", "soon", ""]
+
+
+def test_deadlines_show_weekday_and_countdown(settings):
+    import datetime as dt
+
+    from lpc.app import nice_date
+
+    client = make_client(settings)
+    mid = _open_matter(client)
+    soon = (dt.date.today() + dt.timedelta(days=3)).isoformat()
+    r = client.post(f"/matters/{mid}/deadlines", data={"title": "Status report", "due_on": soon, "source": "court_order"})
+    assert nice_date(soon) in r.text and "in 3 days" in r.text and "deadline status-confirmed soon" in r.text
+    page = client.get("/").text
+    assert nice_date(soon) in page and "in 3 days" in page

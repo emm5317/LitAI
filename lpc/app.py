@@ -74,6 +74,38 @@ DOC_TYPES = ("complaint", "answer", "pleading", "motion", "brief", "order", "jud
 DOC_SOURCES = ("client", "opposing", "court", "third_party", "internal", "email", "public")
 
 
+def nice_date(value: str | None) -> str:
+    """'2026-12-04' -> 'Fri Dec 4, 2026' (anything else is shown as it is)."""
+    try:
+        d = dt.date.fromisoformat(value or "")
+    except ValueError:
+        return value or ""
+    return f"{d:%a %b} {d.day}, {d.year}"
+
+
+def days_away(value: str | None, today: dt.date | None = None) -> int | None:
+    try:
+        return (dt.date.fromisoformat(value or "") - (today or dt.date.today())).days
+    except ValueError:
+        return None
+
+
+def countdown(value: str | None, today: dt.date | None = None) -> str:
+    """'today', 'tomorrow', 'in 8 days', 'yesterday', '3 days ago'."""
+    n = days_away(value, today)
+    if n is None:
+        return ""
+    return {0: "today", 1: "tomorrow", -1: "yesterday"}.get(n, f"in {n} days" if n > 0 else f"{-n} days ago")
+
+
+def due_class(value: str | None, today: dt.date | None = None) -> str:
+    """CSS class for an open deadline: 'overdue' if past, 'soon' within a week."""
+    n = days_away(value, today)
+    if n is None:
+        return ""
+    return "overdue" if n < 0 else "soon" if n <= 7 else ""
+
+
 def plain_terms(q: str) -> list[str]:
     """The words of a search, without OR, excluded words or quote marks (for marking and cites)."""
     terms = []
@@ -183,6 +215,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     templates.env.filters["event_date"] = lambda e: format_event_date(e["event_date"], e["date_precision"])
     templates.env.filters["pin_page"] = pin_page
     templates.env.globals["source_href"] = source_href
+    templates.env.filters["nice_date"] = nice_date
+    templates.env.filters["countdown"] = countdown
+    templates.env.filters["due_class"] = due_class
     templates.env.globals["version"] = __version__
 
     def db() -> sqlite3.Connection:
