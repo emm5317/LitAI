@@ -93,3 +93,56 @@ def test_routes_hold_the_database_lock(settings, monkeypatch):
     client = TestClient(app, base_url="http://127.0.0.1")
     assert client.get("/").status_code == 200
     assert seen == [True] and not app.state.db_lock.locked()
+
+
+def _open_matter(client, **over) -> str:
+    data = {"short_name": "Doe v. Acme", "caption": "Jane Doe v. Acme Logistics, Inc.", "side": "employer",
+            "forum_type": "federal_district"}
+    data.update(over)
+    r = client.post("/matters", data=data, follow_redirects=False)
+    assert r.status_code == 303, r.text
+    return r.headers["location"].rsplit("/", 1)[1]
+
+
+HX = {"HX-Request": "true"}
+
+
+def test_deadline_form_errors_are_shown_not_crashed(settings):
+    client = make_client(settings)
+    mid = _open_matter(client)
+    url = f"/matters/{mid}/deadlines/compute"
+
+    r = client.post(url, data={"entry_id": "frcp.answer", "trigger_date": "11/05/2026"}, headers=HX)
+    assert r.status_code == 400 and r.headers["HX-Retarget"] == "#flash"
+    assert "YYYY-MM-DD" in r.text and "flash-error" in r.text
+
+    r = client.post(url, data={"entry_id": "no.such.rule", "trigger_date": "2026-11-05"}, headers=HX)
+    assert r.status_code == 400 and "not part of this matter" in r.text
+
+    # an AAA rule cannot be used on an N.D. Ill. matter
+    r = client.post(url, data={"entry_id": "aaa.answer", "trigger_date": "2026-11-05"}, headers=HX)
+    assert r.status_code == 400 and "(ndil)" in r.text
+
+    r = client.post(url, data={"entry_id": "frcp.answer"}, headers=HX)
+    assert r.status_code == 422 and "Please fill in: trigger date." in r.text
+
+    assert client.get(f"/matters/{mid}").text.count("deadline status-") == 0   # nothing was stored
+
+
+def test_missing_pages_show_an_error_page(settings):
+    client = make_client(settings)
+    r = client.get("/matters/999")
+    assert r.status_code == 404 and "Matter not found" in r.text and "Go back" in r.text
+    assert "does not exist" in client.get("/nope").text
+
+
+def test_unexpected_errors_are_reported(settings, monkeypatch):
+    import lpc.app
+
+    def boom(conn):
+        raise RuntimeError("disk on fire")
+
+    monkeypatch.setattr(lpc.app, "list_matters", boom)
+    client = TestClient(create_app(settings), base_url="http://127.0.0.1", raise_server_exceptions=False)
+    r = client.get("/", headers=HX)
+    assert r.status_code == 500 and "disk on fire" in r.text

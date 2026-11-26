@@ -11,10 +11,12 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import __version__
 from .backup import list_backups
@@ -99,6 +101,32 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     def db() -> sqlite3.Connection:
         return app.state.conn
+
+    # ----------------------------------------------------------------- errors
+    def show_error(request: Request, message: str, status: int):
+        """HTMX requests get a dismissable message in the page's #flash area; full pages get an error page."""
+        if request.headers.get("hx-request"):
+            return templates.TemplateResponse(
+                request, "partials/error.html", {"message": message}, status_code=status,
+                headers={"HX-Retarget": "#flash", "HX-Reswap": "innerHTML"})
+        return templates.TemplateResponse(request, "error.html", {"message": message, "status": status},
+                                          status_code=status)
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(request: Request, exc: StarletteHTTPException):
+        message = exc.detail if isinstance(exc.detail, str) else "Something went wrong."
+        if message == "Not Found":          # Starlette's text for an unknown URL
+            message = "That page does not exist."
+        return show_error(request, message, exc.status_code)
+
+    @app.exception_handler(RequestValidationError)
+    async def form_error(request: Request, exc: RequestValidationError):
+        fields = sorted({str(e["loc"][-1]).replace("_", " ") for e in exc.errors()})
+        return show_error(request, "Please fill in: " + ", ".join(fields) + ".", 422)
+
+    @app.exception_handler(Exception)
+    async def unexpected_error(request: Request, exc: Exception):
+        return show_error(request, f"Something went wrong ({type(exc).__name__}: {exc}).", 500)
 
     def matter_or_404(matter_id: int) -> sqlite3.Row:
         m = get_matter(db(), matter_id)
@@ -219,8 +247,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def compute_deadline(request: Request, matter_id: int, entry_id: str = Form(...),
                          trigger_date: str = Form(...), service_method: str = Form("")):
         m = matter_or_404(matter_id)
-        comp = compute(entry_id, dt.date.fromisoformat(trigger_date), service_method or None,
-                       profile=m["rules_profile"])
+        profile = m["rules_profile"]
+        if profile not in load_rulesets():
+            raise HTTPException(400, "Set a rules profile on this matter before calculating deadlines.")
+        if entry_id not in {e.id for e in entries_for(profile)}:
+            raise HTTPException(400, f"That rule is not part of this matter's rules ({profile}).")
+        if service_method and service_method not in SERVICE_METHODS:
+            raise HTTPException(400, f"Unknown service method: {service_method}.")
+        try:
+            trigger = dt.date.fromisoformat(trigger_date)
+        except ValueError:
+            raise HTTPException(400, "Enter the trigger date as a date (YYYY-MM-DD).") from None
+        comp = compute(entry_id, trigger, service_method or None, profile=profile)
         cur = db().execute(
             "INSERT INTO deadlines (matter_id, title, due_on, rule_id, rule_cite, trigger_event, trigger_date,"
             " service_method, computation, hard, status, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'proposed', 'rules_engine')",

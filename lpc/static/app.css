@@ -62,3 +62,6 @@ mark { background: #f9eeda; padding: 0 1px; }
 .palette-box { width: min(720px, 92vw); background: #fff; border-radius: 10px; padding: 12px; max-height: 70vh; overflow: auto;
                box-shadow: 0 10px 40px rgba(0,0,0,.2); }
 .palette-box input { width: 100%; font-size: 16px; padding: 10px; }
+#flash { position: fixed; top: 52px; left: 50%; transform: translateX(-50%); z-index: 10; width: min(720px, 92vw); }
+.flash-error { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 8px;
+               background: #fbe9e7; color: #8c2a1c; border: 1px solid #f1c8c1; box-shadow: 0 4px 16px rgba(0,0,0,.08); }

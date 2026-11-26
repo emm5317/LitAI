@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Problem · Law Practice Console{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ "Not found" if status == 404 else "That did not work" }}</h2>
+  <p>{{ message }}</p>
+  <p><button type="button" onclick="history.back()">Go back</button> &nbsp; <a href="/">Dashboard</a></p>
+</div>
+{% endblock %}

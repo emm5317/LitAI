@@ -7,6 +7,20 @@
   <link rel="stylesheet" href="/static/app.css">
   <script src="/static/vendor/htmx.min.js"></script>
   <script defer src="/static/vendor/alpine.min.js"></script>
+  <script>
+    // Error messages arrive with HX-Retarget: #flash. htmx skips error responses by
+    // default, so let those through; clear the old message when a new request starts.
+    document.addEventListener("htmx:beforeSwap", function (e) {
+      if (e.detail.xhr.status >= 400 && e.detail.xhr.getResponseHeader("HX-Retarget")) {
+        e.detail.shouldSwap = true;
+        e.detail.isError = false;
+      }
+    });
+    document.addEventListener("htmx:beforeRequest", function () {
+      var flash = document.getElementById("flash");
+      if (flash) flash.innerHTML = "";
+    });
+  </script>
 </head>
 <body x-data="{ palette: false }"
       @keydown.window.ctrl.k.prevent="palette = true; $nextTick(() => $refs.q.focus())"
@@ -20,6 +34,7 @@
     </nav>
   </header>
 
+  <div id="flash" aria-live="polite"></div>
   <main>{% block content %}{% endblock %}</main>
 
   <div class="palette" x-show="palette" x-cloak @click.self="palette = false">
