@@ -9,7 +9,7 @@
       {% if d.source != 'rules_engine' %}<span class="tag">{{ d.source|replace('_', ' ') }}</span>{% endif %}
       {% if not d.hard %}<span class="tag">soft</span>{% endif %}
     </div>
-    {% if d.computation %}<details><summary>How this was calculated</summary><p class="small">{{ d.computation }}</p></details>{% endif %}
+    {% if d.computation %}<details><summary>{{ "How this was calculated" if d.source == "rules_engine" else "Details" }}</summary><p class="small">{{ d.computation }}</p></details>{% endif %}
     <div class="actions">
       {% if d.status == 'proposed' %}<button hx-post="/deadlines/{{ d.id }}/confirm" hx-target="#deadlines">Confirm</button>{% endif %}
       {% if d.status == 'confirmed' %}<button hx-post="/deadlines/{{ d.id }}/done" hx-target="#deadlines">Mark done</button>{% endif %}

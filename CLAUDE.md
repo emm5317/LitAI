@@ -24,6 +24,8 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | `lpc/matters.py` | matters, party registry, conflicts check, `log_change()` |
 | `lpc/ingest.py` | copy into matter folder, SHA-256 dedupe, PyMuPDF page text, FTS5 search |
 | `lpc/ai/gateway.py` | the ONLY path to a model (consent check, ZDR model block, audit log) |
+| `lpc/backup.py` | daily `VACUUM INTO` backup, keeps 14; started from `__main__.py` |
+| `lpc/config.py` | data / matters / backup folders (OneDrive default; `LPC_*_DIR` overrides) |
 | `lpc/migrations/NNN_*.sql` | schema; applied in order by `lpc/db.py` |
 | `lpc/rules/engine.py` | deadline math; `compute(entry_id, trigger, service_method, profile)` |
 | `lpc/rules/holidays.py` | federal + Illinois calendars; `data/closures.yaml` for one-offs |
@@ -43,7 +45,8 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
    Respect `matters.ai_permitted`. Keep `ai_calls` logging on every path (ok/blocked/error).
 4. **Schema changes = new migration file** (`002_...sql`, `003_...`). Never edit an applied
    migration. Closed vocabularies are `CHECK` constraints; `matters.side` stays required.
-5. **Local only.** Server binds `127.0.0.1`. No CDNs or remote assets; vendor JS into
+5. **Local only.** Server binds `127.0.0.1` and refuses other Host headers and cross-origin POSTs
+   (`local_only_problem()` in `app.py`; tests use `base_url="http://127.0.0.1"`). No CDNs or remote assets; vendor JS into
    `lpc/static/vendor/`. No telemetry. No client data, real names, or `.sqlite3` files in the repo.
 6. **Escape untrusted text.** Document text is rendered escaped; search hits use the `\x02/\x03`
    markers + `highlight` filter, never `|safe` on raw text. FTS input goes through `_fts_query()`.
@@ -55,6 +58,8 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 - Python 3.11+, `from __future__ import annotations`, type hints, stdlib `sqlite3` (no ORM).
 - UI: server-rendered Jinja + HTMX partial swaps + Alpine for small state. No React, no JS build step.
 - Write user-visible changes to `changelog` via `log_change()`.
+- User-facing errors: raise `HTTPException(status, "plain message")`; HTMX requests show it in
+  `#flash`, full pages get `error.html`. Matter folders resolve via `matter_folder()` (stored relative).
 - Matter folders: `00 Record`, `10 Source`, `20 Work Product`, `30 Authorities`, `90 Archive`;
   `documents.file_path` is relative to the matter folder.
 - PowerShell scripts must run on Windows PowerShell 5.1 (no `&&`, no PS7-only syntax).
@@ -75,11 +80,18 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 
 ## Status and next work
 
-Phase 0 done (schema, conflicts, deadlines, ingestion, search, gateway; 23 tests). Roadmap:
-1 matters/deadlines (intake polish, ECF notice parser, dashboard) -> 2 email (Gmail adapter first,
-then Outlook via Graph) -> 3 research + cite checks (eyecite, CourtListener v4 citation lookup,
-verbatim quote match) -> 4 drafting + discovery (.docx via templates; Word stays the editor) ->
-5 settlement/damages analytics.
+Phase 0 done (schema, conflicts, deadlines, ingestion, search, gateway). M0 groundwork done:
+local-only request guard (Host + Origin), per-request DB lock, daily backups (`lpc/backup.py`),
+HTMX errors retargeted to `#flash`, all-or-nothing matter creation, edit matter, court-order
+deadlines and reschedule-with-history (migration 002). Owner's priorities, in order:
+M1 find documents fast (.docx/.eml/.msg text, background ingest jobs, import folder + rescan,
+open hit at PDF page, phrase search, document metadata) -> M2 chronology + depo prep (events UI,
+"add to chronology" from a hit, .docx export via python-docx, optional AI-proposed events) ->
+M3 discovery tracking (sets, auto-proposed response deadlines from ruleset data, limits) ->
+M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
+Later: ECF/NEF parser; email via **Outlook/Graph first** (the practice uses Microsoft 365),
+Gmail after; research + cite checks; drafting; settlement analytics.
+Approved dependencies for M1/M2: `extract-msg`, `python-docx`.
 
 Open items to verify with the user, not guess: Illinois holiday list (205 ILCS 630/17),
 Ill. S. Ct. R. 12 mail-service days, 7th Cir. R. 10(c), FRAP 40(d)(1) subsection, N.D. Ill.

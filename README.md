@@ -23,8 +23,16 @@ window by pywebview (Microsoft Edge WebView2).
    (the command is printed at the end of `setup.ps1`). Request zero data retention on that API
    organization before sending any client material.
 
-Data lives in `%LOCALAPPDATA%\LawPracticeConsole\lpc.sqlite3`; matter folders in
-`Documents\Law Practice Console\Matters`. Override with `LPC_DATA_DIR` / `LPC_MATTERS_DIR`.
+The database lives in `%LOCALAPPDATA%\LawPracticeConsole\lpc.sqlite3` and never syncs. Matter
+folders go in `OneDrive\Law Practice Console\Matters` (or `Documents\...` without OneDrive).
+Override with `LPC_DATA_DIR` / `LPC_MATTERS_DIR`. With OneDrive's Files On-Demand, adding a
+cloud-only file to a matter downloads it first.
+
+**Backups.** Each launch (and hourly while open) the app copies the database to
+`OneDrive\Law Practice Console\Backups\lpc-YYYY-MM-DD.sqlite3` (or `Backups` in the data folder
+without OneDrive), keeping the newest 14; override with `LPC_BACKUP_DIR`. The dashboard shows
+the last backup date. To restore: close the app, delete `lpc.sqlite3` (and any `-wal`/`-shm`
+files) in the data folder, copy a backup there and rename it `lpc.sqlite3`.
 Turn on BitLocker (or Device Encryption) before putting real client files here.
 
 ## What works now
@@ -32,11 +40,16 @@ Turn on BitLocker (or Device Encryption) before putting real client files here.
 - **Open a matter** with a logged conflicts check (fuzzy matching across every party,
   alias and prior matter), the side you represent, forum and rules profile. The matter
   folder tree is created automatically.
+- **Edit a matter** (status, phase, judge, case number, AI consent...); every change is logged.
 - **Deadlines**: pick a rule, enter the trigger date and service method, and the engine
   proposes a date with its arithmetic shown. Nothing is calendared until you confirm it.
+  Court-order and stipulated deadlines can be entered by hand, and any open deadline can be
+  moved to a new date with a reason; the old date is kept in its history.
 - **Documents**: drop files in; PDFs are split into pages, hashed, de-duplicated, and
   indexed. Low-text PDFs are flagged for OCR.
 - **Search**: Ctrl+K searches every document; each matter page searches just that matter.
+- **Local only**: the app refuses requests that are not addressed to 127.0.0.1/localhost and
+  forms submitted from other sites, so a web page in your browser cannot reach your data.
 - **AI gateway** (no UI yet): blocks calls without client consent or on non-ZDR models,
   sends plain Messages API requests, and logs every call to `ai_calls`.
 
