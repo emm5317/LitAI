@@ -110,3 +110,11 @@ button[disabled] { opacity: .5; cursor: not-allowed; }
 .tline .lno { width: 2em; text-align: right; color: var(--muted); user-select: none; flex: none; }
 .tline:target { background: #fff3cd; }
 .page.transcript.current h3 { color: var(--accent); }
+.flash-warn { padding: 10px 14px; border-radius: 8px; background: var(--warn-bg); color: var(--warn); border: 1px solid #f0dcb4; }
+table.discovery td { font-size: 13px; }
+table.discovery tr.notes td { border-top: none; padding-top: 0; }
+table.discovery select { font-size: 12px; padding: 3px 6px; }
+select.status-deficient, select.status-meet_confer, select.status-motion { background: var(--warn-bg); color: var(--warn); }
+select.status-responded, select.status-resolved { background: var(--ok-bg); color: var(--ok); }
+.limits ul { margin: 0; padding-left: 18px; }
+.limits li.warn { color: #a33; }

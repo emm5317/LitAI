@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Discovery · {{ m.short_name }}{% endblock %}
+{% macro set_table(rows) %}
+  {% if rows %}
+  <table class="discovery">
+    <thead><tr><th>Set</th><th>Party</th><th>Served</th><th>Requests</th><th>Response due</th><th>Status</th><th>Documents</th><th></th></tr></thead>
+    <tbody>
+    {% for s in rows %}
+      {% set open = s.status in ('open', 'drafting') %}
+      <tr id="set-{{ s.id }}">
+        <td><strong>{{ s.set_label or set_types[s.set_type] }}</strong><br><span class="muted small">{{ set_types[s.set_type] }}</span></td>
+        <td class="small">{{ s.party or '' }}</td>
+        <td class="nowrap small">{% if s.served_on %}{{ s.served_on|nice_date }}<br><span class="muted">{{ (s.service_method or '')|replace('_', ' ') }}</span>{% endif %}</td>
+        <td>{{ s.request_count if s.request_count is not none else '' }}</td>
+        <td class="nowrap small">{% if s.response_due_on %}
+            <span class="{{ s.response_due_on|due_class if open }}">{{ s.response_due_on|nice_date }}</span>
+            {% if open %}<br><span class="countdown {{ s.response_due_on|due_class }}">{{ s.response_due_on|countdown }}</span>{% endif %}
+            {% if s.deadline_status == 'proposed' %}<br><span class="tag tag-warn">deadline to confirm</span>{% endif %}
+          {% endif %}{% if s.responded_on %}<br><span class="muted">answered {{ s.responded_on|nice_date }}</span>{% endif %}</td>
+        <td>
+          <form method="post" action="/discovery/{{ s.id }}/status">
+            <select name="status" onchange="this.form.submit()" class="status-{{ s.status }}">
+              {% for key, label in statuses.items() %}<option value="{{ key }}" {{ 'selected' if key == s.status }}>{{ label }}</option>{% endfor %}
+            </select>
+          </form>
+        </td>
+        <td class="small">{% if s.request_document_id %}<a href="/documents/{{ s.request_document_id }}">{{ s.request_title }}</a>{% endif %}
+          {% if s.response_document_id %}<br><a href="/documents/{{ s.response_document_id }}">{{ s.response_title }}</a> <span class="muted">(response)</span>{% endif %}</td>
+        <td><a class="small" href="/discovery/{{ s.id }}/edit">Edit</a></td>
+      </tr>
+      {% if s.notes %}<tr class="notes"><td colspan="8" class="muted small">{{ s.notes }}</td></tr>{% endif %}
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">None yet.</p>{% endif %}
+{% endmacro %}
+{% block content %}
+<section class="matter-head">
+  <div>
+    <p class="muted small"><a href="/matters/{{ m.id }}">{{ m.short_name }}</a></p>
+    <h1>Discovery</h1>
+    <p class="muted">{{ m.caption }} · rules: {{ m.rules_profile or 'none set' }}</p>
+  </div>
+</section>
+{% if note %}<p class="flash-warn">{{ note }}</p>{% endif %}
+
+{% if limits %}
+<div class="card limits">
+  <h2>Limits</h2>
+  <ul>
+  {% for l in limits %}
+    <li class="{{ 'warn' if l.over }}"><strong>{{ set_types[l.set_type] }}</strong> {{ 'served on' if l.direction == 'served' else 'served on us by' }} {{ l.party or 'an unnamed party' }}:
+      {{ l.used }} of {{ l.limit }}{% if l.over %}, over the limit{% endif %}
+      <span class="muted small">· {{ l.cite }}{% if not l.verified %} (limit not yet verified){% endif %}{% if l.note %} · {{ l.note }}{% endif %}</span></li>
+  {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<details class="card" id="add" {{ 'open' if adding or not (served or received) }}>
+  <summary><strong>Add a discovery set</strong></summary>
+  <form class="form" method="post" action="/matters/{{ m.id }}/discovery">
+    {% set v = prefill %}
+    {% include "partials/discovery_form.html" %}
+    <button class="primary" type="submit">Add set</button>
+    <span class="muted small">With a service date, the response deadline is proposed from the matter's rules for you to confirm.</span>
+  </form>
+</details>
+
+<div class="card"><h2>Received (we must respond)</h2>{{ set_table(received) }}</div>
+<div class="card"><h2>Served (they must respond)</h2>{{ set_table(served) }}</div>
+{% endblock %}

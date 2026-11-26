@@ -42,6 +42,25 @@
     {% endif %}
   </div>
 </section>
+{% if chase %}
+<section class="card chase">
+  <h2>Discovery to chase</h2>
+  <table>
+    <thead><tr><th>Matter</th><th>Set</th><th>Party</th><th>Why</th></tr></thead>
+    <tbody>
+    {% for s in chase %}
+      <tr>
+        <td><a href="/matters/{{ s.matter_id }}/discovery#set-{{ s.id }}">{{ s.short_name }}</a></td>
+        <td>{{ s.set_label or set_types[s.set_type] }}</td>
+        <td class="small">{{ s.party or '' }}</td>
+        <td class="small">{% if s.status == 'open' %}<span class="overdue">responses were due {{ s.response_due_on|nice_date }} ({{ s.response_due_on|countdown }})</span>
+          {% else %}{{ discovery_statuses[s.status] }}{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 <p class="muted small">
   {% if last_backup %}Last database backup: {{ last_backup }} · {{ backup_dir }}
   {% else %}<span class="tag tag-warn">No database backup yet</span> Backups go to {{ backup_dir }}{% endif %}

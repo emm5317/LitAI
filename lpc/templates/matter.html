@@ -13,6 +13,7 @@
     <span class="tag">{{ m.rules_profile or 'no rules profile' }}</span>
     <span class="tag {{ '' if m.ai_permitted else 'tag-warn' }}">AI {{ 'permitted' if m.ai_permitted else 'off' }}</span>
     <a href="/matters/{{ m.id }}/chronology">Chronology</a>
+    <a href="/matters/{{ m.id }}/discovery">Discovery</a>
     <a href="/matters/{{ m.id }}/edit">Edit matter</a>
   </div>
 </section>

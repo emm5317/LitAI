@@ -1,0 +1,46 @@
+{# Shared by discovery.html (add) and discovery_edit.html. Expects v (current values) and the choices. #}
+<div class="row">
+  <label>We
+    <select name="direction">
+      <option value="received" {{ 'selected' if v.direction == 'received' }}>received this set</option>
+      <option value="served" {{ 'selected' if v.direction == 'served' }}>served this set</option>
+    </select>
+  </label>
+  <label>Kind
+    <select name="set_type">{% for key, label in set_types.items() %}<option value="{{ key }}" {{ 'selected' if key == v.set_type }}>{{ label }}</option>{% endfor %}</select>
+  </label>
+  <label>Party (who served it, or who it was served on)
+    <select name="party_matter_party_id"><option value="">(choose)</option>
+      {% for p in parties %}<option value="{{ p.id }}" {{ 'selected' if p.id == v.party_matter_party_id }}>{{ p.name }} · {{ p.role|replace('_', ' ') }}</option>{% endfor %}
+    </select>
+  </label>
+</div>
+<label>Label <input name="set_label" value="{{ v.set_label or '' }}" placeholder="Defendant's First Set of Interrogatories"></label>
+<div class="row">
+  <label>Served on <input type="date" name="served_on" value="{{ v.served_on or '' }}"></label>
+  <label>Service
+    <select name="service_method">{% for sm in service_methods %}<option value="{{ sm }}" {{ 'selected' if sm == v.service_method }}>{{ sm|replace('_', ' ') }}</option>{% endfor %}</select>
+  </label>
+  <label>Number of requests <input type="number" min="0" name="request_count" value="{{ v.request_count if v.request_count is not none else '' }}" placeholder="e.g. 18"></label>
+  <label>Status
+    <select name="status">{% for key, label in statuses.items() %}<option value="{{ key }}" {{ 'selected' if key == (v.status or 'open') }}>{{ label }}</option>{% endfor %}</select>
+  </label>
+</div>
+<div class="row">
+  <label>Response due <input type="date" name="response_due_on" value="{{ v.response_due_on or '' }}">
+    <span class="muted small">Only needed where the rules give no period (subpoenas, arbitration); otherwise it is calculated.</span></label>
+  <label>Responded on <input type="date" name="responded_on" value="{{ v.responded_on or '' }}"></label>
+</div>
+<div class="row">
+  <label>Request document
+    <select name="request_document_id"><option value="">(none)</option>
+      {% for d in documents %}<option value="{{ d.id }}" {{ 'selected' if d.id == v.request_document_id }}>{{ d.title }}</option>{% endfor %}
+    </select>
+  </label>
+  <label>Response document
+    <select name="response_document_id"><option value="">(none)</option>
+      {% for d in documents %}<option value="{{ d.id }}" {{ 'selected' if d.id == v.response_document_id }}>{{ d.title }}</option>{% endfor %}
+    </select>
+  </label>
+</div>
+<label>Notes <textarea name="notes" rows="2">{{ v.notes or '' }}</textarea></label>

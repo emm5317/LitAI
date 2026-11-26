@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Edit discovery set · {{ m.short_name }}{% endblock %}
+{% block content %}
+<form class="card form" method="post" action="/discovery/{{ s.id }}/edit">
+  <p class="muted small"><a href="/matters/{{ m.id }}">{{ m.short_name }}</a> · <a href="/matters/{{ m.id }}/discovery">Discovery</a></p>
+  <h2>Edit {{ s.set_label or set_types[s.set_type] }}</h2>
+  {% set v = s %}
+  {% include "partials/discovery_form.html" %}
+  <button class="primary" type="submit">Save</button> &nbsp; <a href="/matters/{{ m.id }}/discovery">Cancel</a>
+</form>
+<form method="post" action="/discovery/{{ s.id }}/delete" onsubmit="return confirm('Delete this discovery set? Its deadline stays on the matter.')">
+  <button type="submit" class="link">Delete this set</button>
+</form>
+{% endblock %}

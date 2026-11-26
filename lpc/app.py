@@ -14,7 +14,7 @@ import sys
 import threading
 import uuid
 from pathlib import Path, PureWindowsPath
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -31,6 +31,10 @@ from .chronology import (
     parse_event_date, pin_page, reject_event, save_event,
 )
 from .config import PACKAGE_DIR, Settings, load_settings
+from .discovery import (
+    SERVICE_METHODS as DISCOVERY_SERVICE_METHODS, SET_TYPES, STATUSES as DISCOVERY_STATUSES, DiscoveryError,
+    limits_summary, matter_sets, save_set, set_status, to_chase,
+)
 from .workbook import FIELD_LABELS, WorkbookError, import_rows, key_events_template, match_sources, read_workbook
 from .exports import chronology_csv, chronology_docx, chronology_xlsx, export_name, witness_outline_docx
 from .db import open_database
@@ -264,11 +268,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def dashboard(request: Request):
         upcoming = db().execute(
             "SELECT d.*, m.short_name FROM deadlines d JOIN matters m ON m.id = d.matter_id"
-            " WHERE d.status IN ('proposed', 'confirmed') ORDER BY d.due_on LIMIT 25"
+            " WHERE d.status IN ('proposed', 'confirmed')"
+            # passed soft reminders (the other side's overdue answers) are on the chase list instead
+            " AND (d.hard = 1 OR d.due_on >= date('now', 'localtime')) ORDER BY d.due_on LIMIT 25"
         ).fetchall()
         backups = list_backups(settings.backup_dir)
         return templates.TemplateResponse(request, "dashboard.html", {
             "matters": list_matters(db()), "upcoming": upcoming, "today": dt.date.today().isoformat(),
+            "chase": to_chase(db()), "set_types": SET_TYPES, "discovery_statuses": DISCOVERY_STATUSES,
             "last_backup": backups[-1].stem.removeprefix("lpc-") if backups else None,
             "backup_dir": settings.backup_dir,
         })
@@ -542,6 +549,100 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             db().rollback()
             raise HTTPException(400, f"Could not save the document: {exc}") from exc
         return RedirectResponse(f"/documents/{d['id']}", status_code=303)
+
+    # -------------------------------------------------------------- discovery
+    def set_or_404(set_id: int) -> sqlite3.Row:
+        row = db().execute("SELECT * FROM discovery_sets WHERE id = ?", (set_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Discovery set not found.")
+        return row
+
+    def discovery_choices(matter_id: int) -> dict:
+        return {
+            "parties": matter_parties(db(), matter_id), "set_types": SET_TYPES, "statuses": DISCOVERY_STATUSES,
+            "service_methods": DISCOVERY_SERVICE_METHODS,
+            "documents": db().execute("SELECT id, title, doc_type FROM documents WHERE matter_id = ?"
+                                      " ORDER BY title COLLATE NOCASE", (matter_id,)).fetchall(),
+        }
+
+    async def read_set_form(request: Request) -> dict:
+        form = await request.form()
+        data = {k: str(form.get(k, "")).strip() for k in (
+            "direction", "set_type", "set_label", "served_on", "service_method", "request_count", "response_due_on",
+            "responded_on", "status", "notes")}
+        for key in ("party_matter_party_id", "request_document_id", "response_document_id"):
+            value = str(form.get(key, ""))
+            data[key] = int(value) if value.isdigit() else None
+        return data
+
+    def store_set(matter_id: int, data: dict, set_id: int | None = None) -> tuple[int, str | None]:
+        try:
+            result = save_set(db(), matter_id, data, set_id)
+            db().commit()
+            return result
+        except (DiscoveryError, sqlite3.IntegrityError) as exc:
+            db().rollback()
+            raise HTTPException(400, str(exc)) from exc
+
+    def discovery_redirect(matter_id: int, note: str | None) -> RedirectResponse:
+        query = f"?note={quote(note)}" if note else ""
+        return RedirectResponse(f"/matters/{matter_id}/discovery{query}", status_code=303)
+
+    @app.get("/matters/{matter_id}/discovery", response_class=HTMLResponse)
+    def discovery_page(request: Request, matter_id: int, request_doc: str = "", note: str = ""):
+        m = matter_or_404(matter_id)
+        prefill: dict = {"direction": "received", "status": "open", "service_method": "electronic"}
+        if request_doc.isdigit():
+            d = db().execute("SELECT id, title, source, doc_date FROM documents WHERE id = ? AND matter_id = ?",
+                             (int(request_doc), matter_id)).fetchone()
+            if d:
+                prefill.update(request_document_id=d["id"], set_label=d["title"], served_on=d["doc_date"] or "",
+                               direction="served" if d["source"] == "internal" else "received")
+        sets = matter_sets(db(), matter_id)
+        return templates.TemplateResponse(request, "discovery.html", {
+            "m": m, "served": [s for s in sets if s["direction"] == "served"],
+            "received": [s for s in sets if s["direction"] == "received"],
+            "limits": limits_summary(db(), matter_id, m["rules_profile"]), "prefill": prefill,
+            "adding": bool(request_doc), "note": note, **discovery_choices(matter_id),
+        })
+
+    @app.post("/matters/{matter_id}/discovery")
+    async def add_discovery_set(request: Request, matter_id: int):
+        matter_or_404(matter_id)
+        _, note = store_set(matter_id, await read_set_form(request))
+        return discovery_redirect(matter_id, note)
+
+    @app.get("/discovery/{set_id}/edit", response_class=HTMLResponse)
+    def edit_discovery_set(request: Request, set_id: int):
+        s = set_or_404(set_id)
+        return templates.TemplateResponse(request, "discovery_edit.html", {
+            "s": s, "m": get_matter(db(), s["matter_id"]), **discovery_choices(s["matter_id"])})
+
+    @app.post("/discovery/{set_id}/edit")
+    async def save_discovery_set(request: Request, set_id: int):
+        s = set_or_404(set_id)
+        _, note = store_set(s["matter_id"], await read_set_form(request), set_id)
+        return discovery_redirect(s["matter_id"], note)
+
+    @app.post("/discovery/{set_id}/status")
+    def change_discovery_status(set_id: int, status: str = Form(...)):
+        s = set_or_404(set_id)
+        try:
+            note = set_status(db(), set_id, status)
+            db().commit()
+        except DiscoveryError as exc:
+            db().rollback()
+            raise HTTPException(400, str(exc)) from None
+        return discovery_redirect(s["matter_id"], note)
+
+    @app.post("/discovery/{set_id}/delete")
+    def delete_discovery_set(set_id: int):
+        s = set_or_404(set_id)
+        db().execute("DELETE FROM discovery_sets WHERE id = ?", (set_id,))
+        log_change(db(), s["matter_id"], "discovery_sets", set_id,
+                   f"Deleted discovery set {s['set_label'] or SET_TYPES[s['set_type']]} (its deadline is kept)")
+        db().commit()
+        return discovery_redirect(s["matter_id"], None)
 
     # ------------------------------------------------------------- chronology
     def event_or_404(event_id: int) -> sqlite3.Row:

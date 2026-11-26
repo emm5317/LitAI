@@ -18,6 +18,7 @@
 <div class="doc-actions">
   {% if is_pdf %}<a class="button" href="/documents/{{ d.id }}/file#page={{ page }}" target="_blank">View PDF{% if page > 1 %} at p. {{ page }}{% endif %}</a>{% endif %}
   <a class="button" href="/matters/{{ m.id }}/chronology?doc={{ d.id }}#add">+ Chronology</a>
+  {% if d.doc_type in ('discovery_request', 'discovery_response', 'other') %}<a class="button" href="/matters/{{ m.id }}/discovery?request_doc={{ d.id }}#add">+ Discovery set</a>{% endif %}
   {% if m.ai_permitted %}
   <button hx-post="/documents/{{ d.id }}/suggest-events" hx-swap="none" hx-confirm="Send this document's text to the AI model (zero data retention) to suggest chronology events?">Suggest events (AI)</button>
   {% else %}
