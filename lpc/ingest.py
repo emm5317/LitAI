@@ -11,6 +11,7 @@ indexed as their own documents with parent_id pointing at the email.
 from __future__ import annotations
 
 import hashlib
+import re
 import shutil
 import sqlite3
 from pathlib import Path
@@ -139,35 +140,99 @@ def update_document(conn: sqlite3.Connection, doc_id: int, data: dict) -> list[s
     return list(changes)
 
 
+_TOKEN = re.compile(r'"([^"]*)"|(\S+)')
+
+
 def _fts_query(text: str) -> str:
-    """Turn free text into a safe FTS5 query: each word quoted, implicit AND; a trailing * keeps prefix search."""
-    terms = []
-    for word in text.split():
+    """Turn what the user typed into a safe FTS5 query. Every word is quoted, so nothing they type
+    can be read as FTS syntax; only these are understood:
+
+        night shift      both words, anywhere on the page
+        "night shift"    the exact phrase
+        overtim*         words starting with "overtim"
+        nights OR weekends   either word
+        overtime -exempt     pages with "overtime" but not "exempt"
+    """
+    parts: list[str] = []
+    for phrase, word in _TOKEN.findall(text):
+        if phrase:
+            words = phrase.split()
+            if words:
+                parts.append('"' + " ".join(words) + '"')
+            continue
+        if word == "OR":
+            if parts and parts[-1] != "OR":
+                parts.append("OR")
+            continue
+        negate = word.startswith("-")
         prefix = word.endswith("*")
-        word = word.rstrip("*").replace('"', "")
-        if word:
-            terms.append(f'"{word}"' + ("*" if prefix else ""))
-    return " ".join(terms)
+        word = word.strip("-*").replace('"', "")
+        if not word:
+            continue
+        term = f'"{word}"' + ("*" if prefix else "")
+        if negate:
+            if parts and parts[-1] != "OR":          # FTS5 NOT needs something before it
+                parts.append(f"NOT {term}")
+            continue
+        parts.append(term)
+    while parts and parts[-1] == "OR":
+        parts.pop()
+    return " ".join(parts)
 
 
-def search(conn: sqlite3.Connection, text: str, matter_id: int | None = None, limit: int = 50) -> list[sqlite3.Row]:
+def _filters(matter_id, doc_type, source, date_from, date_to, key_only) -> tuple[str, list]:
+    sql, params = "", []
+    for column, value in (("d.matter_id", matter_id), ("d.doc_type", doc_type), ("d.source", source)):
+        if value not in (None, ""):
+            sql += f" AND {column} = ?"
+            params.append(value)
+    if date_from:
+        sql += " AND d.doc_date >= ?"
+        params.append(date_from)
+    if date_to:
+        sql += " AND d.doc_date <= ?"
+        params.append(date_to)
+    if key_only:
+        sql += " AND d.key_document = 1"
+    return sql, params
+
+
+def search(conn: sqlite3.Connection, text: str, matter_id: int | None = None, limit: int = 50, *,
+           doc_type: str | None = None, source: str | None = None, date_from: str | None = None,
+           date_to: str | None = None, key_only: bool = False) -> list[sqlite3.Row]:
+    """Pages matching `text`, best first. Date filters use the document date (YYYY-MM-DD)."""
     query = _fts_query(text)
     if not query:
         return []
+    where, params = _filters(matter_id, doc_type, source, date_from, date_to, key_only)
     sql = (
-        "SELECT d.id AS document_id, d.title, d.matter_id, d.file_path, d.doc_type, m.short_name, dp.page_no,"
+        "SELECT d.id AS document_id, d.title, d.matter_id, d.file_path, d.doc_type, d.doc_date, m.short_name,"
+        " dp.page_no,"
         # \x02/\x03 mark hits; the UI escapes the text first, then turns them into <mark>
         " snippet(document_pages_fts, 0, char(2), char(3), ' ... ', 16) AS snippet"
         " FROM document_pages_fts"
         " JOIN document_pages dp ON dp.rowid = document_pages_fts.rowid"
         " JOIN documents d ON d.id = dp.document_id"
         " JOIN matters m ON m.id = d.matter_id"
-        " WHERE document_pages_fts MATCH ?"
+        " WHERE document_pages_fts MATCH ?" + where +
+        " ORDER BY bm25(document_pages_fts) LIMIT ?"
     )
-    params: list = [query]
-    if matter_id is not None:
-        sql += " AND d.matter_id = ?"
-        params.append(matter_id)
-    sql += " ORDER BY bm25(document_pages_fts) LIMIT ?"
-    params.append(limit)
-    return conn.execute(sql, params).fetchall()
+    return conn.execute(sql, [query, *params, limit]).fetchall()
+
+
+def search_titles(conn: sqlite3.Connection, text: str, matter_id: int | None = None, limit: int = 10,
+                  **filters) -> list[sqlite3.Row]:
+    """Documents whose title contains every plain word typed (catches files with no text,
+    such as scans, spreadsheets and photos). Operators and excluded words are ignored."""
+    words = [w.strip('"*').lower() for w in re.findall(r'"[^"]*"|\S+', text)
+             if w != "OR" and not w.startswith("-")]
+    words = [w for w in words if w]
+    if not words:
+        return []
+    where, params = _filters(matter_id, filters.get("doc_type"), filters.get("source"), filters.get("date_from"),
+                             filters.get("date_to"), filters.get("key_only", False))
+    likes = " AND ".join("instr(lower(d.title), ?) > 0" for _ in words)
+    return conn.execute(
+        "SELECT d.id AS document_id, d.title, d.matter_id, d.file_path, d.doc_type, d.doc_date, m.short_name"
+        f" FROM documents d JOIN matters m ON m.id = d.matter_id WHERE {likes}{where}"
+        " ORDER BY d.doc_date DESC, d.id DESC LIMIT ?", [*words, *params, limit]).fetchall()

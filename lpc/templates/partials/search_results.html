@@ -1,11 +1,22 @@
-{% if q and not hits %}
+{% if q and not hits and not titles %}
   <p class="muted">No matches.</p>
+{% endif %}
+{% if titles %}
+<div class="title-hits">
+  <h3>Titles</h3>
+  {% for t in titles %}
+  <div><a href="/documents/{{ t.document_id }}">{{ t.title }}</a>
+    <span class="muted small">{{ t.short_name }} · {{ t.doc_type|replace('_', ' ') }}{% if t.doc_date %} · {{ t.doc_date }}{% endif %}</span></div>
+  {% endfor %}
+</div>
+{% if hits %}<h3>Text</h3>{% endif %}
 {% endif %}
 {% for h in hits %}
 <div class="hit">
   <div><a href="/matters/{{ h.matter_id }}">{{ h.short_name }}</a> ·
     <a href="/documents/{{ h.document_id }}?page={{ h.page_no }}&q={{ q|urlencode }}#p-{{ h.page_no }}"><strong>{{ h.title }}</strong></a>
     <span class="muted">p. {{ h.page_no }}</span>
+    <span class="muted small">{{ h.doc_type|replace('_', ' ') }}{% if h.doc_date %} · {{ h.doc_date }}{% endif %}</span>
     {% if h.file_path.lower().endswith('.pdf') %}<a class="small" href="/documents/{{ h.document_id }}/file#page={{ h.page_no }}" target="_blank">view PDF</a>{% endif %}
   </div>
   <div class="snippet">{{ h.snippet|highlight }}</div>

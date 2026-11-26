@@ -79,3 +79,7 @@ a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--lin
 .page { border-top: 1px solid var(--line); padding-top: 4px; }
 .page.current h3 { color: var(--accent); }
 .page-text { white-space: pre-wrap; font-size: 13px; line-height: 1.5; }
+.search-form input[type=search] { width: 100%; }
+.search-form .inline-form { margin: 8px 0 0; }
+.search-form label { display: flex; align-items: center; gap: 4px; }
+.title-hits div { padding: 3px 0; }

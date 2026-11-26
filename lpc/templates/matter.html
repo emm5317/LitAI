@@ -103,8 +103,18 @@
 
   <div class="card">
     <h2>Search this matter</h2>
-    <input type="search" name="q" placeholder="Words or phrases"
-           hx-get="/search" hx-vals='{"matter_id": {{ m.id }}}' hx-trigger="input changed delay:250ms, search" hx-target="#matter-search">
+    <form class="search-form" hx-get="/search" hx-target="#matter-search" hx-trigger="input delay:300ms, change, submit">
+      <input type="hidden" name="matter_id" value="{{ m.id }}">
+      <input type="search" name="q" placeholder="Words or phrases" autocomplete="off">
+      <div class="inline-form small">
+        <select name="doc_type"><option value="">Any type</option>{% for t in type_choices %}<option value="{{ t }}">{{ t|replace('_', ' ') }}</option>{% endfor %}</select>
+        <select name="source"><option value="">Any source</option>{% for v, label in source_choices[1:] %}<option value="{{ v }}">{{ label }}</option>{% endfor %}</select>
+        <label>From <input type="date" name="date_from"></label>
+        <label>To <input type="date" name="date_to"></label>
+        <label class="check"><input type="checkbox" name="key_only" value="1"> Key only</label>
+      </div>
+      <p class="muted small">"exact phrase" &nbsp; overtim* &nbsp; nights OR weekends &nbsp; overtime -exempt</p>
+    </form>
     <div id="matter-search"></div>
     <h3>Recent changes</h3>
     <ul class="changes">

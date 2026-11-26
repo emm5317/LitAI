@@ -27,7 +27,7 @@ from . import __version__
 from .backup import list_backups
 from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
-from .ingest import DOC_FIELDS, _fts_query, free_path, search, update_document
+from .ingest import DOC_FIELDS, _fts_query, free_path, search, search_titles, update_document
 from .jobs import enqueue
 from .matters import (
     EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
@@ -438,9 +438,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return RedirectResponse(f"/documents/{d['id']}", status_code=303)
 
     @app.get("/search", response_class=HTMLResponse)
-    def search_view(request: Request, q: str = "", matter_id: int | None = None):
-        hits = search(db(), q, matter_id) if q.strip() else []
-        return templates.TemplateResponse(request, "partials/search_results.html", {"hits": hits, "q": q})
+    def search_view(request: Request, q: str = "", matter_id: int | None = None, doc_type: str = "",
+                    source: str = "", date_from: str = "", date_to: str = "", key_only: str = ""):
+        for value, label in ((date_from, "from date"), (date_to, "to date")):
+            if value:
+                parse_date(value, label)
+        filters = {"doc_type": doc_type or None, "source": source or None, "date_from": date_from or None,
+                   "date_to": date_to or None, "key_only": bool(key_only)}
+        hits = search(db(), q, matter_id, **filters) if q.strip() else []
+        titles = search_titles(db(), q, matter_id, **filters) if q.strip() else []
+        return templates.TemplateResponse(request, "partials/search_results.html",
+                                          {"hits": hits, "titles": titles, "q": q})
 
     @app.post("/matters/{matter_id}/deadlines/compute", response_class=HTMLResponse)
     def compute_deadline(request: Request, matter_id: int, entry_id: str = Form(...),
