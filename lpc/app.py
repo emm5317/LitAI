@@ -6,10 +6,11 @@ import datetime as dt
 import shutil
 import sqlite3
 import tempfile
+import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -66,9 +67,20 @@ def local_only_problem(method: str, headers) -> str | None:
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     conn = open_database(settings.db_path)
+    # One connection serves the whole app, and FastAPI runs requests on several threads.
+    # Without a lock, one request's commit() could commit another's half-finished writes.
+    # Every route holds this lock for its whole run; background jobs open their own connection.
+    db_lock = threading.Lock()
+
+    def hold_db_lock():
+        with db_lock:
+            yield
+
     # No /docs or /openapi.json: there is no public API to describe.
     app = FastAPI(title="Law Practice Console", version=__version__,
-                  docs_url=None, redoc_url=None, openapi_url=None)
+                  docs_url=None, redoc_url=None, openapi_url=None,
+                  dependencies=[Depends(hold_db_lock)])
+    app.state.db_lock = db_lock
 
     @app.middleware("http")
     async def local_only(request: Request, call_next):

@@ -76,3 +76,20 @@ def test_no_api_docs(settings):
     client = make_client(settings)
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert client.get(path).status_code == 404
+
+
+def test_routes_hold_the_database_lock(settings, monkeypatch):
+    import lpc.app
+
+    seen = []
+    real = lpc.app.list_matters
+
+    def spy(conn):
+        seen.append(app.state.db_lock.locked())
+        return real(conn)
+
+    monkeypatch.setattr(lpc.app, "list_matters", spy)
+    app = create_app(settings)
+    client = TestClient(app, base_url="http://127.0.0.1")
+    assert client.get("/").status_code == 200
+    assert seen == [True] and not app.state.db_lock.locked()
