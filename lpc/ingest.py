@@ -119,6 +119,26 @@ def ingest_file(conn: sqlite3.Connection, matter: sqlite3.Row, matter_root: Path
     return Ingested(doc_id, True)
 
 
+DOC_FIELDS = ("title", "doc_type", "doc_date", "author", "recipients", "bates_begin", "bates_end", "docket_no",
+              "source", "received_on", "privileged", "key_document", "summary", "notes")
+
+
+def update_document(conn: sqlite3.Connection, doc_id: int, data: dict) -> list[str]:
+    """Save edited document details and log one line naming the fields that changed.
+    Blank values are stored as NULL. Returns the changed field names. Does not commit."""
+    current = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    changes = {f: (None if data[f] in ("", None) else data[f]) for f in DOC_FIELDS if f in data}
+    changes = {f: v for f, v in changes.items() if v != current[f]}
+    if not changes:
+        return []
+    assignments = ", ".join(f"{f} = ?" for f in changes)
+    conn.execute(f"UPDATE documents SET {assignments} WHERE id = ?", (*changes.values(), doc_id))
+    names = [f.replace("_", " ") for f in changes]
+    log_change(conn, current["matter_id"], "documents", doc_id,
+               f"Updated document {changes.get('title') or current['title']}: {', '.join(names)}")
+    return list(changes)
+
+
 def _fts_query(text: str) -> str:
     """Turn free text into a safe FTS5 query: each word quoted, implicit AND; a trailing * keeps prefix search."""
     terms = []
@@ -135,7 +155,7 @@ def search(conn: sqlite3.Connection, text: str, matter_id: int | None = None, li
     if not query:
         return []
     sql = (
-        "SELECT d.id AS document_id, d.title, d.matter_id, m.short_name, dp.page_no,"
+        "SELECT d.id AS document_id, d.title, d.matter_id, d.file_path, d.doc_type, m.short_name, dp.page_no,"
         # \x02/\x03 mark hits; the UI escapes the text first, then turns them into <mark>
         " snippet(document_pages_fts, 0, char(2), char(3), ' ... ', 16) AS snippet"
         " FROM document_pages_fts"

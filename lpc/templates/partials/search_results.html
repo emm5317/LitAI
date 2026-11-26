@@ -3,7 +3,11 @@
 {% endif %}
 {% for h in hits %}
 <div class="hit">
-  <div><a href="/matters/{{ h.matter_id }}">{{ h.short_name }}</a> · <strong>{{ h.title }}</strong> <span class="muted">p. {{ h.page_no }}</span></div>
+  <div><a href="/matters/{{ h.matter_id }}">{{ h.short_name }}</a> ·
+    <a href="/documents/{{ h.document_id }}?page={{ h.page_no }}&q={{ q|urlencode }}#p-{{ h.page_no }}"><strong>{{ h.title }}</strong></a>
+    <span class="muted">p. {{ h.page_no }}</span>
+    {% if h.file_path.lower().endswith('.pdf') %}<a class="small" href="/documents/{{ h.document_id }}/file#page={{ h.page_no }}" target="_blank">view PDF</a>{% endif %}
+  </div>
   <div class="snippet">{{ h.snippet|highlight }}</div>
 </div>
 {% endfor %}

@@ -6,6 +6,10 @@ import datetime as dt
 import shutil
 import sqlite3
 import json
+import mimetypes
+import os
+import subprocess
+import sys
 import threading
 import uuid
 from pathlib import Path, PureWindowsPath
@@ -13,7 +17,7 @@ from urllib.parse import urlsplit
 
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -23,7 +27,7 @@ from . import __version__
 from .backup import list_backups
 from .config import PACKAGE_DIR, Settings, load_settings
 from .db import open_database
-from .ingest import free_path, search
+from .ingest import DOC_FIELDS, _fts_query, free_path, search, update_document
 from .jobs import enqueue
 from .matters import (
     EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
@@ -46,6 +50,29 @@ def parse_date(value: str, label: str) -> dt.date:
         return dt.date.fromisoformat(value.strip())
     except ValueError:
         raise HTTPException(400, f"Enter the {label} as a date (YYYY-MM-DD).") from None
+
+
+# Files that would run a program rather than open a document. "Open" refuses them.
+RUNNABLE_SUFFIXES = {".exe", ".bat", ".cmd", ".com", ".msi", ".scr", ".ps1", ".vbs", ".vbe", ".js", ".jse",
+                     ".wsf", ".hta", ".jar", ".lnk", ".url", ".reg", ".cpl", ".pif"}
+PAGES_SHOWN = 50
+DOC_TYPES = ("complaint", "answer", "pleading", "motion", "brief", "order", "judgment", "correspondence", "email",
+             "discovery_request", "discovery_response", "production", "transcript", "exhibit", "declaration",
+             "contract", "policy", "payroll_data", "time_data", "research", "work_product", "demand", "award", "other")
+DOC_SOURCES = ("client", "opposing", "court", "third_party", "internal", "email", "public")
+
+
+def open_in_os(path: Path, reveal: bool = False) -> None:
+    """Open a file in its usual program, or show it selected in Explorer (reveal=True)."""
+    if sys.platform == "win32":
+        if reveal:
+            subprocess.Popen(["explorer", f"/select,{path}"])
+        else:
+            os.startfile(path)  # noqa: S606 - the path comes from the documents table, not the request
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", "-R", str(path)] if reveal else ["open", str(path)])
+    else:
+        subprocess.Popen(["xdg-open", str(path.parent if reveal else path)])
 
 
 def highlight(snippet: str | None) -> Markup:
@@ -325,6 +352,90 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def documents_view(request: Request, matter_id: int):
         matter_or_404(matter_id)
         return templates.TemplateResponse(request, "partials/documents.html", {"documents": matter_documents(matter_id)})
+
+    # -------------------------------------------------------------- documents
+    def document_or_404(doc_id: int) -> sqlite3.Row:
+        d = db().execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+        if d is None:
+            raise HTTPException(404, "Document not found.")
+        return d
+
+    def document_path(d: sqlite3.Row) -> Path:
+        """The document's file, refusing any stored path that points outside its matter folder."""
+        root = matter_folder(get_matter(db(), d["matter_id"]), settings.matters_dir).resolve()
+        path = (root / d["file_path"]).resolve()
+        if root not in path.parents:
+            raise HTTPException(403, "That file is outside the matter folder.")
+        if not path.is_file():
+            raise HTTPException(404, f"The file is missing from the matter folder: {d['file_path']}")
+        return path
+
+    @app.get("/documents/{doc_id}", response_class=HTMLResponse)
+    def document_detail(request: Request, doc_id: int, page: int = 1, q: str = ""):
+        d = document_or_404(doc_id)
+        start = max(1, page - 5)
+        pages = db().execute("SELECT page_no, text FROM document_pages WHERE document_id = ? AND page_no >= ?"
+                             " ORDER BY page_no LIMIT ?", (doc_id, start, PAGES_SHOWN)).fetchall()
+        texts = {r["page_no"]: r["text"] for r in pages}
+        query = _fts_query(q)
+        if query and texts:
+            # Mark the search words; the template escapes the text, then turns \x02/\x03 into <mark>.
+            for r in db().execute(
+                "SELECT dp.page_no, highlight(document_pages_fts, 0, char(2), char(3)) AS text"
+                " FROM document_pages_fts JOIN document_pages dp ON dp.rowid = document_pages_fts.rowid"
+                " WHERE document_pages_fts MATCH ? AND dp.document_id = ? AND dp.page_no BETWEEN ? AND ?",
+                    (query, doc_id, min(texts), max(texts))):
+                texts[r["page_no"]] = r["text"]
+        return templates.TemplateResponse(request, "document.html", {
+            "d": d, "m": get_matter(db(), d["matter_id"]), "pages": sorted(texts.items()), "page": page, "q": q,
+            "start": start, "more": d["page_count"] and start + PAGES_SHOWN <= d["page_count"],
+            "parent": db().execute("SELECT id, title FROM documents WHERE id = ?", (d["parent_id"],)).fetchone()
+            if d["parent_id"] else None,
+            "children": db().execute("SELECT id, title FROM documents WHERE parent_id = ? ORDER BY id",
+                                     (doc_id,)).fetchall(),
+            "doc_types": DOC_TYPES, "doc_sources": DOC_SOURCES, "pages_shown": PAGES_SHOWN,
+        })
+
+    @app.get("/documents/{doc_id}/file")
+    def document_file(doc_id: int):
+        """The file itself, shown in the window (PDFs open at #page=N)."""
+        path = document_path(document_or_404(doc_id))
+        media_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        return FileResponse(path, media_type=media_type, filename=path.name, content_disposition_type="inline")
+
+    @app.post("/documents/{doc_id}/open")
+    def document_open(doc_id: int):
+        path = document_path(document_or_404(doc_id))
+        if path.suffix.lower() in RUNNABLE_SUFFIXES:
+            raise HTTPException(400, f"{path.name} is a program, not a document, so it was not opened. "
+                                     "Use Show in folder if you need it.")
+        open_in_os(path)
+        return Response(status_code=204)
+
+    @app.post("/documents/{doc_id}/reveal")
+    def document_reveal(doc_id: int):
+        open_in_os(document_path(document_or_404(doc_id)), reveal=True)
+        return Response(status_code=204)
+
+    @app.post("/documents/{doc_id}/edit")
+    async def document_save(request: Request, doc_id: int):
+        d = document_or_404(doc_id)
+        form = await request.form()
+        data = {f: str(form.get(f, "")).strip() for f in DOC_FIELDS}
+        data["privileged"] = 1 if form.get("privileged") else 0
+        data["key_document"] = 1 if form.get("key_document") else 0
+        if not data["title"]:
+            raise HTTPException(400, "A document needs a title.")
+        for field in ("doc_date", "received_on"):
+            if data[field]:
+                parse_date(data[field], field.replace("_", " "))
+        try:
+            update_document(db(), doc_id, data)
+            db().commit()
+        except sqlite3.IntegrityError as exc:
+            db().rollback()
+            raise HTTPException(400, f"Could not save the document: {exc}") from exc
+        return RedirectResponse(f"/documents/{d['id']}", status_code=303)
 
     @app.get("/search", response_class=HTMLResponse)
     def search_view(request: Request, q: str = "", matter_id: int | None = None):
