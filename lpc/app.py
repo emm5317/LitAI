@@ -7,9 +7,10 @@ import shutil
 import sqlite3
 import tempfile
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup, escape
@@ -36,10 +37,46 @@ def highlight(snippet: str | None) -> Markup:
     return Markup(text.replace("\x02", "<mark>").replace("\x03", "</mark>"))
 
 
+LOCAL_HOSTS = {"127.0.0.1", "localhost"}
+UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def local_only_problem(method: str, headers) -> str | None:
+    """Why a request must be refused, or None if it is fine.
+
+    The server listens on 127.0.0.1, but a web page open in your normal browser can still
+    send requests to it. Two checks stop that:
+      * Host must be 127.0.0.1 or localhost. This defeats "DNS rebinding", where an outside
+        site points its own name at 127.0.0.1 to read your data.
+      * A POST must come from this app's own page (Origin matches Host). This stops another
+        site, or another local program's page, from submitting forms here.
+    """
+    host = headers.get("host", "")
+    if urlsplit(f"//{host}").hostname not in LOCAL_HOSTS:
+        return "Requests must be addressed to 127.0.0.1 or localhost."
+    if method in UNSAFE_METHODS:
+        origin = headers.get("origin")
+        if origin and urlsplit(origin).netloc != host:
+            return "Form submitted from another site."
+        if headers.get("sec-fetch-site") == "cross-site":
+            return "Form submitted from another site."
+    return None
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     conn = open_database(settings.db_path)
-    app = FastAPI(title="Law Practice Console", version=__version__)
+    # No /docs or /openapi.json: there is no public API to describe.
+    app = FastAPI(title="Law Practice Console", version=__version__,
+                  docs_url=None, redoc_url=None, openapi_url=None)
+
+    @app.middleware("http")
+    async def local_only(request: Request, call_next):
+        problem = local_only_problem(request.method, request.headers)
+        if problem:
+            return PlainTextResponse(f"Refused: {problem}", status_code=403)
+        return await call_next(request)
+
     app.state.settings = settings
     app.state.conn = conn
     app.mount("/static", StaticFiles(directory=PACKAGE_DIR / "static"), name="static")

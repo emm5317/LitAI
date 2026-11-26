@@ -3,8 +3,13 @@ from fastapi.testclient import TestClient
 from lpc.app import create_app
 
 
+def make_client(settings) -> TestClient:
+    # The app only answers requests addressed to 127.0.0.1 or localhost.
+    return TestClient(create_app(settings), base_url="http://127.0.0.1")
+
+
 def test_end_to_end(settings):
-    client = TestClient(create_app(settings))
+    client = make_client(settings)
     assert client.get("/health").json()["ok"]
     assert "No matters yet" in client.get("/").text
     assert "Open a matter" in client.get("/matters/new").text
@@ -50,3 +55,24 @@ def test_end_to_end(settings):
     assert "<script>" not in r.text
 
     assert "Upcoming deadlines" in client.get("/").text
+
+
+def test_refuses_outside_hosts_and_cross_site_posts(settings):
+    client = make_client(settings)
+    assert client.get("/", headers={"Host": "evil.example"}).status_code == 403   # DNS rebinding
+    form = {"short_name": "X", "caption": "X v. Y", "side": "employee"}
+    r = client.post("/matters", data=form, headers={"Origin": "https://evil.example"}, follow_redirects=False)
+    assert r.status_code == 403
+    r = client.post("/matters", data=form, headers={"Origin": "http://localhost:3000"}, follow_redirects=False)
+    assert r.status_code == 403                                                    # other local app
+    r = client.post("/matters", data=form, headers={"Sec-Fetch-Site": "cross-site"}, follow_redirects=False)
+    assert r.status_code == 403
+    r = client.post("/matters", data=form, headers={"Origin": "http://127.0.0.1"}, follow_redirects=False)
+    assert r.status_code == 303                                                    # our own page
+    assert client.get("/", headers={"Host": "localhost:8765"}).status_code == 200
+
+
+def test_no_api_docs(settings):
+    client = make_client(settings)
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 404

@@ -4,6 +4,7 @@ __pycache__/
 build/
 dist/
 *.spec
+*.egg-info/
 .pytest_cache/
 # downloaded rule texts are reproducible from scripts/fetch_rules.ps1
 rules/sources/*
