@@ -208,3 +208,51 @@ def test_edit_matter_rejects_bad_values(settings):
     assert r.status_code == 400
     r = client.post(f"/matters/{mid}/edit", data={**base, "rules_profile": "mars"})
     assert r.status_code == 400 and "Unknown deadline rules" in r.text
+
+
+def test_court_order_deadline_and_reschedule(settings):
+    client = make_client(settings)
+    mid = _open_matter(client)
+    conn = client.app.state.conn
+
+    r = client.post(f"/matters/{mid}/deadlines", data={
+        "title": "Close of fact discovery", "due_on": "2027-03-01", "source": "court_order",
+        "rule_cite": "Dkt. 23", "hard": "1"})
+    assert r.status_code == 200 and "Close of fact discovery" in r.text and "court order" in r.text
+    row = conn.execute("SELECT * FROM deadlines WHERE title = 'Close of fact discovery'").fetchone()
+    assert row["status"] == "confirmed" and row["confirmed_at"] and row["rule_cite"] == "Dkt. 23"
+    assert "Close of fact discovery" in client.get("/").text        # on the dashboard
+
+    r = client.post(f"/deadlines/{row['id']}/reschedule", data={"due_on": "2027-04-15", "reason": "Dkt. 31 extension"})
+    assert "2027-04-15" in r.text and "2027-03-01" not in r.text.split("Moved from")[0]
+    old = conn.execute("SELECT status FROM deadlines WHERE id = ?", (row["id"],)).fetchone()
+    new = conn.execute("SELECT * FROM deadlines WHERE supersedes_id = ?", (row["id"],)).fetchone()
+    assert old["status"] == "superseded" and new["due_on"] == "2027-04-15" and new["status"] == "confirmed"
+    assert "Moved from 2027-03-01: Dkt. 31 extension." in new["computation"]
+    assert "Moved deadline Close of fact discovery: 2027-03-01 -&gt; 2027-04-15" in client.get(f"/matters/{mid}").text
+
+    # a superseded deadline cannot be moved again; the new one can
+    r = client.post(f"/deadlines/{row['id']}/reschedule", data={"due_on": "2027-05-01", "reason": "x"}, headers=HX)
+    assert r.status_code == 400 and "superseded" in r.text
+
+
+def test_manual_deadline_validation(settings):
+    client = make_client(settings)
+    mid = _open_matter(client)
+    url = f"/matters/{mid}/deadlines"
+    r = client.post(url, data={"title": "X", "due_on": "March 1", "source": "court_order"}, headers=HX)
+    assert r.status_code == 400 and "due date" in r.text
+    r = client.post(url, data={"title": "X", "due_on": "2027-03-01", "source": "rules_engine"}, headers=HX)
+    assert r.status_code == 400
+    r = client.post(url, data={"due_on": "2027-03-01"}, headers=HX)
+    assert r.status_code == 422 and "title" in r.text
+
+
+def test_manual_deadlines_work_without_a_rules_profile(settings):
+    client = make_client(settings)
+    mid = _open_matter(client, forum_type="agency")                  # no deadline rules for agencies
+    page = client.get(f"/matters/{mid}").text
+    assert "Set a rules profile" in page and "Add a deadline from a court order" in page
+    r = client.post(f"/matters/{mid}/deadlines", data={"title": "EEOC position statement", "due_on": "2027-01-15",
+                                                       "source": "manual"})
+    assert "EEOC position statement" in r.text

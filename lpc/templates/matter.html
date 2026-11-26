@@ -39,6 +39,19 @@
     {% else %}
       <p class="muted">Set a rules profile on this matter to calculate deadlines.</p>
     {% endif %}
+    <details class="add-deadline">
+      <summary>Add a deadline from a court order, stipulation, or by hand</summary>
+      <form class="inline-form" hx-post="/matters/{{ m.id }}/deadlines" hx-target="#deadlines" hx-on::after-request="if (event.detail.successful) this.reset()">
+        <input name="title" placeholder="What is due (e.g. Close of fact discovery)" required size="34">
+        <input type="date" name="due_on" required>
+        <select name="source">
+          {% for key, label in manual_sources.items() %}<option value="{{ key }}">{{ label|capitalize }}</option>{% endfor %}
+        </select>
+        <input name="rule_cite" placeholder="Order or cite (e.g. Dkt. 23)">
+        <label class="check small"><input type="checkbox" name="hard" value="1" checked> Hard deadline</label>
+        <button type="submit">Add</button>
+      </form>
+    </details>
     <div id="deadlines">{% include "partials/deadlines.html" %}</div>
   </div>
 

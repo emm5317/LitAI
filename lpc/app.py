@@ -36,6 +36,16 @@ PROFILE_BY_FORUM = {
 }
 
 
+MANUAL_SOURCES = {"court_order": "court order", "stipulation": "stipulation", "manual": "entered by hand"}
+
+
+def parse_date(value: str, label: str) -> dt.date:
+    try:
+        return dt.date.fromisoformat(value.strip())
+    except ValueError:
+        raise HTTPException(400, f"Enter the {label} as a date (YYYY-MM-DD).") from None
+
+
 def highlight(snippet: str | None) -> Markup:
     """Escape document text, then mark FTS hits (\\x02...\\x03) with <mark>."""
     text = str(escape(snippet or ""))
@@ -206,10 +216,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "parties": matter_parties(c, matter_id),
             "documents": c.execute("SELECT * FROM documents WHERE matter_id = ? ORDER BY created_at DESC",
                                    (matter_id,)).fetchall(),
-            "deadlines": c.execute("SELECT * FROM deadlines WHERE matter_id = ? AND status != 'vacated'"
-                                   " ORDER BY due_on", (matter_id,)).fetchall(),
+            "deadlines": live_deadlines(matter_id),
             "entries": entries_for(profile) if profile in load_rulesets() else [],
             "service_methods": SERVICE_METHODS,
+            "manual_sources": MANUAL_SOURCES,
             "rulesets": load_rulesets(),
             "changes": c.execute("SELECT * FROM changelog WHERE matter_id = ? ORDER BY id DESC LIMIT 15",
                                  (matter_id,)).fetchall(),
@@ -231,11 +241,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if data["rules_profile"] and data["rules_profile"] not in load_rulesets():
             raise HTTPException(400, f"Unknown deadline rules: {data['rules_profile']}.")
         for field in ("commenced_on", "served_on"):
-            try:
-                if data[field]:
-                    dt.date.fromisoformat(data[field])
-            except ValueError:
-                raise HTTPException(400, f"Enter {field.replace('_', ' ')} as a date (YYYY-MM-DD).") from None
+            if data[field]:
+                parse_date(data[field], field.replace("_", " "))
         try:
             update_matter(db(), matter_id, data)
             db().commit()
@@ -293,10 +300,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(400, f"That rule is not part of this matter's rules ({profile}).")
         if service_method and service_method not in SERVICE_METHODS:
             raise HTTPException(400, f"Unknown service method: {service_method}.")
-        try:
-            trigger = dt.date.fromisoformat(trigger_date)
-        except ValueError:
-            raise HTTPException(400, "Enter the trigger date as a date (YYYY-MM-DD).") from None
+        trigger = parse_date(trigger_date, "trigger date")
         comp = compute(entry_id, trigger, service_method or None, profile=profile)
         cur = db().execute(
             "INSERT INTO deadlines (matter_id, title, due_on, rule_id, rule_cite, trigger_event, trigger_date,"
@@ -309,6 +313,54 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                    actor="system")
         db().commit()
         return _deadlines_partial(request, matter_id)
+
+    @app.post("/matters/{matter_id}/deadlines", response_class=HTMLResponse)
+    def add_deadline(request: Request, matter_id: int, title: str = Form(...), due_on: str = Form(...),
+                     source: str = Form("court_order"), rule_cite: str = Form(""), notes: str = Form(""),
+                     hard: str = Form("")):
+        """A deadline you enter yourself (court order, stipulation, or by hand). You typed the date, so it
+        is saved as confirmed; computed deadlines still start as proposed."""
+        matter_or_404(matter_id)
+        if source not in MANUAL_SOURCES:
+            raise HTTPException(400, f"Unknown deadline source: {source}.")
+        due = parse_date(due_on, "due date")
+        cur = db().execute(
+            "INSERT INTO deadlines (matter_id, title, due_on, rule_cite, computation, hard, status, source,"
+            " confirmed_at, notes) VALUES (?, ?, ?, ?, ?, ?, 'confirmed', ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?)",
+            (matter_id, title.strip(), due.isoformat(), rule_cite.strip() or None,
+             f"Entered by hand ({MANUAL_SOURCES[source]}).", 1 if hard else 0, source, notes.strip() or None),
+        )
+        log_change(db(), matter_id, "deadlines", cur.lastrowid,
+                   f"Added deadline ({MANUAL_SOURCES[source]}): {title.strip()} {due}")
+        db().commit()
+        return _deadlines_partial(request, matter_id)
+
+    @app.post("/deadlines/{deadline_id}/reschedule", response_class=HTMLResponse)
+    def reschedule_deadline(request: Request, deadline_id: int, due_on: str = Form(...), reason: str = Form(...)):
+        """Move a deadline to a new date. The old row is kept as 'superseded' so the history survives."""
+        old = db().execute("SELECT * FROM deadlines WHERE id = ?", (deadline_id,)).fetchone()
+        if old is None:
+            raise HTTPException(404, "Deadline not found.")
+        if old["status"] not in ("proposed", "confirmed"):
+            raise HTTPException(400, f"Only open deadlines can be moved (this one is {old['status']}).")
+        due = parse_date(due_on, "new date")
+        reason = reason.strip()
+        if not reason:
+            raise HTTPException(400, "Say why the date changed (for example, \"Dkt. 31 extension\").")
+        cur = db().execute(
+            "INSERT INTO deadlines (matter_id, title, due_on, due_time, rule_id, rule_cite, trigger_event,"
+            " trigger_date, service_method, computation, hard, status, source, confirmed_at, notes, supersedes_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'confirmed', ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), ?, ?)",
+            (old["matter_id"], old["title"], due.isoformat(), old["due_time"], old["rule_id"], old["rule_cite"],
+             old["trigger_event"], old["trigger_date"], old["service_method"],
+             f"Moved from {old['due_on']}: {reason}." + (f" Original: {old['computation']}" if old["computation"] else ""),
+             old["hard"], old["source"], old["notes"], deadline_id),
+        )
+        db().execute("UPDATE deadlines SET status = 'superseded' WHERE id = ?", (deadline_id,))
+        log_change(db(), old["matter_id"], "deadlines", cur.lastrowid,
+                   f"Moved deadline {old['title']}: {old['due_on']} -> {due} ({reason})")
+        db().commit()
+        return _deadlines_partial(request, old["matter_id"])
 
     @app.post("/deadlines/{deadline_id}/{action}", response_class=HTMLResponse)
     def deadline_action(request: Request, deadline_id: int, action: str):
@@ -327,9 +379,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         db().commit()
         return _deadlines_partial(request, row["matter_id"])
 
+    def live_deadlines(matter_id: int) -> list[sqlite3.Row]:
+        return db().execute("SELECT * FROM deadlines WHERE matter_id = ? AND status IN ('proposed', 'confirmed', 'done')"
+                            " ORDER BY due_on", (matter_id,)).fetchall()
+
     def _deadlines_partial(request: Request, matter_id: int):
-        rows = db().execute("SELECT * FROM deadlines WHERE matter_id = ? AND status != 'vacated' ORDER BY due_on",
-                            (matter_id,)).fetchall()
-        return templates.TemplateResponse(request, "partials/deadlines.html", {"deadlines": rows})
+        return templates.TemplateResponse(request, "partials/deadlines.html", {"deadlines": live_deadlines(matter_id)})
 
     return app
