@@ -169,6 +169,9 @@ def test_search_and_document_page_cite_page_and_line(client):
     r = client.get("/search", params={"q": "night shift"})
     assert "Tr. 12:3" in r.text and f"/documents/{client.doc}?tp=12&q=night%20shift#t-12-3" in r.text
     assert "pin=12%3A3" in r.text                                        # "+ chronology" carries the cite
+    snippet = hit["snippet"].replace("\x02", "").replace("\x03", "")
+    assert "moved me to the night shift" in " ".join(snippet.split())     # no margin numbers in between
+    assert not any(tok.isdigit() and int(tok) <= 25 for tok in snippet.split())
 
     page = client.get(f"/documents/{client.doc}?tp=12&q=night").text
     assert 'id="t-12-3" data-cite="12:3"' in page and "<mark>night</mark>" in page

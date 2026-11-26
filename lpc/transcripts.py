@@ -107,10 +107,19 @@ def parse_transcript(path: Path) -> list[TLine]:
 
 # ----------------------------------------------------------------- storing
 def store_transcript(conn: sqlite3.Connection, document_id: int, lines: list[TLine]) -> None:
-    """Replace the document's transcript lines. Does not commit."""
+    """Replace the document's transcript lines, and make the searchable text of those PDF pages the
+    clean line text, so search snippets do not show the margin numbers ("moved me to 3 the night
+    shift"). Covers and the word index keep their original text. Does not commit."""
     conn.execute("DELETE FROM transcript_lines WHERE document_id = ?", (document_id,))
     conn.executemany("INSERT INTO transcript_lines (document_id, pdf_page, page, line, text) VALUES (?, ?, ?, ?, ?)",
                      [(document_id, ln.pdf_page, ln.page, ln.line, ln.text) for ln in lines])
+    by_pdf_page: dict[int, list[str]] = {}
+    for ln in lines:
+        if ln.text:
+            by_pdf_page.setdefault(ln.pdf_page, []).append(ln.text)
+    # The FTS index follows document_pages through its update trigger.
+    conn.executemany("UPDATE document_pages SET text = ? WHERE document_id = ? AND page_no = ?",
+                     [("\n".join(texts), document_id, page) for page, texts in by_pdf_page.items()])
 
 
 def is_transcript(conn: sqlite3.Connection, document_id: int) -> bool:
