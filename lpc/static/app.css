@@ -90,3 +90,8 @@ a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--lin
 .nowrap { white-space: nowrap; }
 .form fieldset.people { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-bottom: 10px; }
 .form fieldset.people label.check { flex: 0 0 auto; margin-bottom: 0; }
+.flash-ok { display: flex; justify-content: space-between; gap: 12px; padding: 10px 14px; border-radius: 8px;
+            background: var(--ok-bg); color: var(--ok); border: 1px solid #c9e4c7; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+.export-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
+.export-bar .inline-form { margin: 0; }
+.spacer { flex: 1; }

@@ -14,6 +14,7 @@ Set-Location $root
     --add-data "lpc\rules\sources.json;lpc\rules" `
     --collect-submodules uvicorn `
     --collect-data extract_msg `
+    --collect-data docx `
     run_console.py
 
 Write-Host "Built dist\LawPracticeConsole\LawPracticeConsole.exe"

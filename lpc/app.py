@@ -30,6 +30,7 @@ from .chronology import (
     parse_event_date, pin_page, save_event,
 )
 from .config import PACKAGE_DIR, Settings, load_settings
+from .exports import chronology_csv, chronology_docx, chronology_xlsx, export_name, witness_outline_docx
 from .db import open_database
 from .ingest import DOC_FIELDS, _fts_query, free_path, search, search_titles, update_document
 from .jobs import enqueue
@@ -47,6 +48,10 @@ PROFILE_BY_FORUM = {
 
 
 MANUAL_SOURCES = {"court_order": "court order", "stipulation": "stipulation", "manual": "entered by hand"}
+
+
+def plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
 
 
 def parse_date(value: str, label: str) -> dt.date:
@@ -534,6 +539,64 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         delete_event(db(), event_id)
         db().commit()
         return RedirectResponse(f"/matters/{e['matter_id']}/chronology", status_code=303)
+
+    def show_notice(request: Request, message: str, path: Path | None = None):
+        """A green message in the page's #flash area (used after saving an export)."""
+        return templates.TemplateResponse(request, "partials/notice.html", {"message": message, "path": path},
+                                          headers={"HX-Retarget": "#flash", "HX-Reswap": "innerHTML"})
+
+    def save_export(m: sqlite3.Row, description: str, suffix: str, data: bytes) -> Path:
+        """Write an export into the matter's 20 Work Product folder, log it, and open it."""
+        folder = matter_folder(m, settings.matters_dir) / "20 Work Product"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = free_path(folder, export_name(m["short_name"], description, suffix))
+        path.write_bytes(data)
+        log_change(db(), m["id"], "exports", None, f"Exported {description} to 20 Work Product/{path.name}")
+        db().commit()
+        try:
+            open_in_os(path)
+        except Exception:      # no program for this file type; the notice still says where it is
+            pass
+        return path
+
+    @app.post("/matters/{matter_id}/chronology/export", response_class=HTMLResponse)
+    def export_chronology(request: Request, matter_id: int, format: str = Form("docx"), person: str = Form(""),
+                          issue: str = Form(""), key_only: str = Form(""), disputed_only: str = Form("")):
+        m = matter_or_404(matter_id)
+        if format not in ("docx", "xlsx", "csv"):
+            raise HTTPException(400, f"Unknown export format: {format}.")
+        filters = {"person": int(person) if person.isdigit() else None, "issue": issue or None,
+                   "key_only": bool(key_only), "disputed_only": bool(disputed_only)}
+        events = chronology(db(), matter_id, **filters)
+        if not events:
+            raise HTTPException(400, "There are no events to export with these filters.")
+        described = []
+        if filters["person"]:
+            described.append(db().execute("SELECT p.name FROM matter_parties mp JOIN parties p ON p.id = mp.party_id"
+                                          " WHERE mp.id = ?", (filters["person"],)).fetchone()[0])
+        if issue:
+            described.append(f"issue: {issue}")
+        if key_only:
+            described.append("key events only")
+        if disputed_only:
+            described.append("disputed events only")
+        subtitle = f"Filtered: {'; '.join(described)}." if described else ""
+        data = {"docx": lambda: chronology_docx(m, events, subtitle), "xlsx": lambda: chronology_xlsx(m, events),
+                "csv": lambda: chronology_csv(events)}[format]()
+        path = save_export(m, "Chronology", f".{format}", data)
+        return show_notice(request, f"Saved {plural(len(events), 'event')} to", path)
+
+    @app.post("/matters/{matter_id}/chronology/witness", response_class=HTMLResponse)
+    def export_witness_outline(request: Request, matter_id: int, witness: str = Form("")):
+        m = matter_or_404(matter_id)
+        row = db().execute("SELECT mp.id, mp.role, mp.title, p.name FROM matter_parties mp"
+                           " JOIN parties p ON p.id = mp.party_id WHERE mp.id = ? AND mp.matter_id = ?",
+                           (int(witness) if witness.isdigit() else -1, matter_id)).fetchone()
+        if row is None:
+            raise HTTPException(400, "Choose the person the outline is for.")
+        events = chronology(db(), matter_id, person=row["id"])
+        path = save_export(m, f"Depo outline - {row['name']}", ".docx", witness_outline_docx(m, row, events))
+        return show_notice(request, f"Saved an outline with {plural(len(events), 'event')} to", path)
 
     @app.get("/search", response_class=HTMLResponse)
     def search_view(request: Request, q: str = "", matter_id: int | None = None, doc_type: str = "",
