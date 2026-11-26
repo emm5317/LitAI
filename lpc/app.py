@@ -26,8 +26,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from . import __version__
 from .backup import list_backups
 from .chronology import (
-    SIGNIFICANCE, EventError, chronology, delete_event, event_people_ids, format_event_date, issue_tags,
-    parse_event_date, pin_page, save_event,
+    SIGNIFICANCE, EventError, accept_event, chronology, delete_event, event_people_ids, format_event_date, issue_tags,
+    parse_event_date, pin_page, reject_event, save_event,
 )
 from .config import PACKAGE_DIR, Settings, load_settings
 from .exports import chronology_csv, chronology_docx, chronology_xlsx, export_name, witness_outline_docx
@@ -505,8 +505,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                    "key_only": bool(key_only), "disputed_only": bool(disputed_only)}
         return templates.TemplateResponse(request, "chronology.html", {
             "m": m, "events": chronology(db(), matter_id, **filters), "filters": filters,
+            "proposed": chronology(db(), matter_id, status="proposed"),
             "prefill": prefill, "adding": bool(doc or pin or text or date),
-            "total": db().execute("SELECT COUNT(*) FROM events WHERE matter_id = ?", (matter_id,)).fetchone()[0],
+            "total": db().execute("SELECT COUNT(*) FROM events WHERE matter_id = ? AND status = 'accepted'",
+                                  (matter_id,)).fetchone()[0],
             **event_form_choices(matter_id),
         })
 
@@ -532,6 +534,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         data, people = await read_event_form(request)
         store_event(e["matter_id"], data, people, event_id)
         return RedirectResponse(f"/matters/{e['matter_id']}/chronology#{e['event_code']}", status_code=303)
+
+    @app.post("/events/{event_id}/accept")
+    def accept_suggestion(event_id: int):
+        e = event_or_404(event_id)
+        try:
+            code = accept_event(db(), event_id)
+        except EventError as exc:
+            raise HTTPException(400, str(exc)) from None
+        db().commit()
+        return RedirectResponse(f"/matters/{e['matter_id']}/chronology#{code}", status_code=303)
+
+    @app.post("/events/{event_id}/reject")
+    def reject_suggestion(event_id: int):
+        e = event_or_404(event_id)
+        try:
+            reject_event(db(), event_id)
+        except EventError as exc:
+            raise HTTPException(400, str(exc)) from None
+        db().commit()
+        return RedirectResponse(f"/matters/{e['matter_id']}/chronology#proposed", status_code=303)
+
+    @app.post("/documents/{doc_id}/suggest-events", response_class=HTMLResponse)
+    def suggest_document_events(request: Request, doc_id: int):
+        """Queue an AI read of this document for chronology events (only with the client's consent)."""
+        d = document_or_404(doc_id)
+        m = get_matter(db(), d["matter_id"])
+        if not m["ai_permitted"]:
+            raise HTTPException(400, "AI is off for this matter. Turn on client consent under Edit matter first.")
+        if not d["page_count"] or d["text_status"] in ("failed", "not_applicable"):
+            raise HTTPException(400, "This document has no text to read.")
+        enqueue(db(), "suggest_events", m["id"], f"AI event suggestions from {d['title']}", {"document_id": doc_id})
+        app.state.job_signal.set()
+        return show_notice(request, "Reading the document. Suggestions will appear for review on the Chronology page;"
+                                    " progress shows on the matter page.")
 
     @app.post("/events/{event_id}/delete")
     def remove_event(event_id: int):

@@ -3,11 +3,15 @@
 {% block content %}
 <form class="card form" method="post" action="/events/{{ e.id }}/edit">
   <p class="muted small"><a href="/matters/{{ m.id }}">{{ m.short_name }}</a> · <a href="/matters/{{ m.id }}/chronology">Chronology</a></p>
-  <h2>Edit {{ e.event_code }}</h2>
+  <h2>Edit {{ e.event_code }}{% if e.status == 'proposed' %} <span class="tag tag-warn">AI suggestion, not yet accepted</span>{% endif %}</h2>
+  {% if e.quote %}<blockquote>"{{ e.quote }}"</blockquote>{% endif %}
   {% set v = e %}
   {% include "partials/event_form.html" %}
   <button class="primary" type="submit">Save</button> &nbsp; <a href="/matters/{{ m.id }}/chronology#{{ e.event_code }}">Cancel</a>
 </form>
+{% if e.status == 'proposed' %}
+<form method="post" action="/events/{{ e.id }}/accept"><button type="submit">Accept into the chronology</button></form>
+{% endif %}
 <form method="post" action="/events/{{ e.id }}/delete" onsubmit="return confirm('Delete {{ e.event_code }}? This cannot be undone.')">
   <button type="submit" class="link">Delete this event</button>
 </form>

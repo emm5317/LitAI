@@ -140,16 +140,17 @@ def delete_event(conn: sqlite3.Connection, event_id: int) -> None:
 
 # ---------------------------------------------------------------- reading
 def chronology(conn: sqlite3.Connection, matter_id: int, *, person: int | None = None, issue: str | None = None,
-               key_only: bool = False, disputed_only: bool = False) -> list[sqlite3.Row]:
-    """Events in date order (undated last), with people names and the source document."""
+               key_only: bool = False, disputed_only: bool = False, status: str = "accepted") -> list[sqlite3.Row]:
+    """Events in date order (undated last), with people names and the source document.
+    AI suggestions awaiting review are left out unless status='proposed'."""
     sql = (
         "SELECT e.*, d.title AS source_title, d.file_path AS source_path, d.bates_begin AS source_bates,"
         " (SELECT group_concat(p.name, ', ') FROM event_people ep"
         "   JOIN matter_parties mp ON mp.id = ep.matter_party_id JOIN parties p ON p.id = mp.party_id"
         "   WHERE ep.event_id = e.id) AS people"
-        " FROM events e LEFT JOIN documents d ON d.id = e.source_document_id WHERE e.matter_id = ?"
+        " FROM events e LEFT JOIN documents d ON d.id = e.source_document_id WHERE e.matter_id = ? AND e.status = ?"
     )
-    params: list = [matter_id]
+    params: list = [matter_id, status]
     if person:
         sql += " AND EXISTS (SELECT 1 FROM event_people ep WHERE ep.event_id = e.id AND ep.matter_party_id = ?)"
         params.append(person)
@@ -162,6 +163,25 @@ def chronology(conn: sqlite3.Connection, matter_id: int, *, person: int | None =
         sql += " AND e.disputed = 1"
     sql += " ORDER BY e.event_date IS NULL, e.event_date, e.event_code"
     return conn.execute(sql, params).fetchall()
+
+
+def accept_event(conn: sqlite3.Connection, event_id: int) -> str:
+    """Accept an AI suggestion: it joins the chronology with the next E- code. Does not commit."""
+    row = conn.execute("SELECT matter_id, event_code, status FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row["status"] != "proposed":
+        raise EventError(f"{row['event_code']} is already in the chronology.")
+    code = next_event_code(conn, row["matter_id"])
+    conn.execute("UPDATE events SET status = 'accepted', event_code = ? WHERE id = ?", (code, event_id))
+    log_change(conn, row["matter_id"], "events", event_id, f"Accepted AI-suggested event {code} (was {row['event_code']})")
+    return code
+
+
+def reject_event(conn: sqlite3.Connection, event_id: int) -> None:
+    row = conn.execute("SELECT matter_id, event_code, status FROM events WHERE id = ?", (event_id,)).fetchone()
+    if row["status"] != "proposed":
+        raise EventError(f"{row['event_code']} is in the chronology; edit or delete it instead.")
+    conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
+    log_change(conn, row["matter_id"], "events", event_id, f"Rejected AI-suggested event {row['event_code']}")
 
 
 def event_people_ids(conn: sqlite3.Connection, event_id: int) -> set[int]:

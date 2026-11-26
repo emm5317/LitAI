@@ -95,3 +95,10 @@ a.button { display: inline-block; padding: 6px 12px; border: 1px solid var(--lin
 .export-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .export-bar .inline-form { margin: 0; }
 .spacer { flex: 1; }
+.proposed { border-color: #ead9b0; background: #fffcf4; }
+.suggestion { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.suggestion .date { font-weight: 600; margin-right: 6px; }
+.suggestion .actions { display: flex; gap: 10px; align-items: center; margin-top: 6px; }
+.suggestion .actions form { margin: 0; }
+blockquote { margin: 6px 0; padding: 4px 10px; border-left: 3px solid var(--line); color: #444; font-size: 13px; }
+button[disabled] { opacity: .5; cursor: not-allowed; }

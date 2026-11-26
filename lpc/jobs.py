@@ -56,7 +56,22 @@ def _files(conn: sqlite3.Connection, job: sqlite3.Row, root: Path) -> list[tuple
     raise ValueError(f"unknown job kind {job['kind']}")
 
 
+def _run_suggest_events(conn: sqlite3.Connection, job: sqlite3.Row) -> None:
+    from .ai.events import suggest_events      # imported here: only this job needs the AI code
+
+    def progress(done: int, total: int) -> None:
+        conn.execute("UPDATE jobs SET done_count = ?, total = ? WHERE id = ?", (done, total, job["id"]))
+        conn.commit()
+
+    summary, problems = suggest_events(conn, json.loads(job["params"])["document_id"], progress=progress)
+    conn.execute(f"UPDATE jobs SET status = 'done', summary = ?, problems = ?, finished_at = {NOW} WHERE id = ?",
+                 (summary, json.dumps(problems[:MAX_PROBLEMS]), job["id"]))
+    conn.commit()
+
+
 def run_job(conn: sqlite3.Connection, job: sqlite3.Row, matters_root: Path) -> None:
+    if job["kind"] == "suggest_events":
+        return _run_suggest_events(conn, job)
     matter = get_matter(conn, job["matter_id"])
     if matter is None:
         raise ValueError("the matter no longer exists")

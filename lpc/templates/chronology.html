@@ -9,6 +9,27 @@
   </div>
 </section>
 
+{% if proposed %}
+<div class="card proposed" id="proposed">
+  <h2>Suggested by AI: {{ proposed|length }} to review</h2>
+  <p class="muted small">These are not in the chronology until you accept them. Each quote was found word for word on the page cited; check that the description is fair to it.</p>
+  {% for e in proposed %}
+  <div class="suggestion" id="{{ e.event_code }}">
+    <div><span class="date">{{ e|event_date }}</span> {{ e.description }}
+      {% if e.significance == 'key' %}<span class="tag tag-ok">key</span>{% endif %}
+      {% if e.people %}<span class="muted small">· {{ e.people }}</span>{% endif %}</div>
+    <blockquote>"{{ e.quote }}" <a class="small" href="/documents/{{ e.source_document_id }}?page={{ e.pin|pin_page }}&q={{ e.quote|truncate(60, true, '')|urlencode }}#p-{{ e.pin|pin_page }}">{{ e.source_title }}, {{ e.pin }}</a></blockquote>
+    {% if e.notes %}<p class="muted small">{{ e.notes }}</p>{% endif %}
+    <div class="actions">
+      <form method="post" action="/events/{{ e.id }}/accept"><button type="submit">Accept</button></form>
+      <a class="button" href="/events/{{ e.id }}/edit">Edit first</a>
+      <form method="post" action="/events/{{ e.id }}/reject"><button type="submit" class="link">Reject</button></form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <details class="card" id="add" {{ 'open' if adding }}>
   <summary><strong>Add an event</strong></summary>
   <form class="form" method="post" action="/matters/{{ m.id }}/events">

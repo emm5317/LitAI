@@ -33,6 +33,14 @@ class GatewayBlocked(Exception):
     """Raised when policy forbids the call. Nothing was sent."""
 
 
+class GatewayRefused(Exception):
+    """The model declined the request (stop_reason "refusal"). The call is logged as an error.
+
+    Server-side refusal fallbacks are deliberately not used: the fallback model is picked by the
+    API, so the zero-data-retention check above could not vet it.
+    """
+
+
 @dataclass
 class AIRequest:
     purpose: str
@@ -43,7 +51,16 @@ class AIRequest:
     template: str | None = None
     template_version: str | None = None
     model: str = DEFAULT_MODEL
-    max_tokens: int = 4096
+    max_tokens: int = 16000            # thinking counts toward this on current models
+    effort: str | None = None          # "low" | "medium" | "high" | "xhigh" | "max"
+    # Filled in by complete():
+    call_id: int | None = None         # the ai_calls row for this request
+    stop_reason: str | None = None
+
+
+def _http_client() -> httpx.Client:
+    # Long documents with thinking can take minutes; match the SDK's 10-minute default.
+    return httpx.Client(timeout=600)
 
 
 def get_api_key() -> str | None:
@@ -103,21 +120,30 @@ def complete(conn: sqlite3.Connection, req: AIRequest, *, client: httpx.Client |
     }
     if req.system:
         body["system"] = req.system
+    if req.effort:
+        body["output_config"] = {"effort": req.effort}
     headers = {"x-api-key": key, "anthropic-version": API_VERSION, "content-type": "application/json"}
 
     own_client = client is None
-    client = client or httpx.Client(timeout=120)
+    client = client or _http_client()
     try:
         resp = client.post(API_URL, headers=headers, json=body)
         resp.raise_for_status()
         data = resp.json()
     except Exception as exc:  # network, HTTP or decode errors are all logged the same way
-        _log(conn, req, "error", error=str(exc)[:500])
+        req.call_id = _log(conn, req, "error", error=str(exc)[:500])
         raise
     finally:
         if own_client:
             client.close()
 
+    req.stop_reason = data.get("stop_reason")
+    if req.stop_reason == "refusal":
+        category = (data.get("stop_details") or {}).get("category")
+        reason = "the model declined this request" + (f" ({category})" if category else "")
+        req.call_id = _log(conn, req, "error", error=reason, usage=data.get("usage"))
+        raise GatewayRefused(reason)
+    # Thinking blocks come back too (empty text by default); only the answer's text blocks count.
     text = "".join(block.get("text", "") for block in data.get("content", []) if block.get("type") == "text")
-    _log(conn, req, "ok", usage=data.get("usage"))
+    req.call_id = _log(conn, req, "ok", usage=data.get("usage"))
     return text

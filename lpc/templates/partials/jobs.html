@@ -4,7 +4,7 @@
     <strong>{{ j.label }}</strong>
     {% if j.status == 'queued' %}<span class="muted">waiting to start...</span>
     {% elif j.status == 'running' %}
-      <span class="muted">{{ j.done_count }} of {{ j.total if j.total is not none else '?' }} files</span>
+      <span class="muted">{{ j.done_count }} of {{ j.total if j.total is not none else '?' }} {{ 'parts' if j.kind == 'suggest_events' else 'files' }}</span>
       {% if j.total %}<progress value="{{ j.done_count }}" max="{{ j.total }}"></progress>{% endif %}
     {% elif j.status == 'done' %}<span class="ok">{{ j.summary }}</span>
     {% else %}<span class="warn">Stopped: {{ j.error }}</span>{% endif %}
