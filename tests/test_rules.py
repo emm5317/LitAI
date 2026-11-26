@@ -1,7 +1,7 @@
 import datetime as dt
 
 from lpc.rules.engine import compute, entries_for, load_rulesets, validate
-from lpc.rules.holidays import federal_holidays, illinois_extra_holidays
+from lpc.rules.holidays import federal_holidays, holiday_name, illinois_extra_holidays
 
 D = dt.date
 
@@ -69,3 +69,13 @@ def test_unverified_entries_warn():
     c = compute("frcp.answer", D(2026, 11, 2), profile="ndil")
     assert any("not been verified" in w for w in c.warnings)
     assert c.explanation
+
+
+def test_holiday_calendars_are_cached():
+    federal_holidays.cache_clear()
+    illinois_extra_holidays.cache_clear()
+    for _ in range(50):
+        holiday_name(D(2026, 11, 26), ["federal", "illinois"])
+        holiday_name(D(2026, 11, 3), ["federal", "illinois"])
+    assert federal_holidays.cache_info().misses == 1
+    assert illinois_extra_holidays.cache_info().misses == 1

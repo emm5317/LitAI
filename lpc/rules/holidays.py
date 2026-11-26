@@ -42,7 +42,9 @@ def observed(day: dt.date) -> dt.date:
     return day
 
 
+@lru_cache
 def federal_holidays(year: int) -> dict[dt.date, str]:
+    """Cached per year: callers must read the dict, never change it."""
     days = {
         observed(dt.date(year, 1, 1)): "New Year's Day",
         nth_weekday(year, 1, 0, 3): "Birthday of Martin Luther King, Jr.",
@@ -83,7 +85,9 @@ def _resolve(spec: dict, year: int) -> dt.date | None:
     raise ValueError(f"unknown holiday rule {kind}")
 
 
+@lru_cache
 def illinois_extra_holidays(year: int) -> dict[dt.date, str]:
+    """Cached per year: callers must read the dict, never change it."""
     out = {}
     for spec in _illinois_spec()["holidays"]:
         day = _resolve(spec, year)
