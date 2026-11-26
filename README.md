@@ -45,9 +45,16 @@ Turn on BitLocker (or Device Encryption) before putting real client files here.
   proposes a date with its arithmetic shown. Nothing is calendared until you confirm it.
   Court-order and stipulated deadlines can be entered by hand, and any open deadline can be
   moved to a new date with a reason; the old date is kept in its history.
-- **Documents**: drop files in; PDFs are split into pages, hashed, de-duplicated, and
-  indexed. Low-text PDFs are flagged for OCR.
-- **Search**: Ctrl+K searches every document; each matter page searches just that matter.
+- **Documents**: add files, **import a whole folder** (paste its path), or **rescan** the matter
+  folder to pick up files saved there in Explorer. Work runs in the background with a progress
+  panel. PDFs, Word (.docx), emails (.eml and Outlook .msg) and text files are indexed page by
+  page; email attachments become their own linked documents. Duplicates (same contents) are
+  skipped; unreadable or scanned files are flagged.
+- **Document page**: each document's text page by page, "view PDF" at any page, open in Word or
+  Acrobat, show in Explorer, and edit its details (date, Bates range, source, key, privileged...).
+- **Search**: Ctrl+K searches every document; each matter page searches just that matter, with
+  filters for type, source, date and key documents. `"exact phrase"`, `overtim*`,
+  `nights OR weekends` and `overtime -exempt` work. Hits open the document at the right page.
 - **Local only**: the app refuses requests that are not addressed to 127.0.0.1/localhost and
   forms submitted from other sites, so a web page in your browser cannot reach your data.
 - **AI gateway** (no UI yet): blocks calls without client consent or on non-ZDR models,

@@ -22,7 +22,9 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | --- | --- |
 | `lpc/app.py` | FastAPI routes; pages + HTMX partials (`templates/partials/`) |
 | `lpc/matters.py` | matters, party registry, conflicts check, `log_change()` |
-| `lpc/ingest.py` | copy into matter folder, SHA-256 dedupe, PyMuPDF page text, FTS5 search |
+| `lpc/ingest.py` | copy into matter folder, SHA-256 dedupe, email attachments as child docs, FTS5 search |
+| `lpc/extract.py` | file -> page text: PDF (PyMuPDF), DOCX (raw XML), EML (stdlib), MSG (extract-msg) |
+| `lpc/jobs.py` | background jobs table + one worker thread (upload, import folder, rescan) |
 | `lpc/ai/gateway.py` | the ONLY path to a model (consent check, ZDR model block, audit log) |
 | `lpc/backup.py` | daily `VACUUM INTO` backup, keeps 14; started from `__main__.py` |
 | `lpc/config.py` | data / matters / backup folders (OneDrive default; `LPC_*_DIR` overrides) |
@@ -74,8 +76,9 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
   prefilter by token before adding fuzzy scoring at scale).
 - `load_rulesets()` and holiday lookups are `lru_cache`d; call `load_rulesets.cache_clear()` if
   rules are edited at runtime.
-- Long work (OCR, large ingests, mail sync, AI drafting) must not block a request: move it to a
-  background job and return an HTMX partial that polls.
+- Long work (OCR, large ingests, mail sync, AI drafting) must not block a request: add a job kind
+  in `lpc/jobs.py` (+ migration for the `kind` CHECK), `enqueue()` it, `app.state.job_signal.set()`,
+  and return `jobs_partial()`, which polls. Tests call `run_pending()` instead of the thread.
 - Keep HTMX partials small; swap only the region that changed.
 
 ## Status and next work
@@ -83,9 +86,11 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 Phase 0 done (schema, conflicts, deadlines, ingestion, search, gateway). M0 groundwork done:
 local-only request guard (Host + Origin), per-request DB lock, daily backups (`lpc/backup.py`),
 HTMX errors retargeted to `#flash`, all-or-nothing matter creation, edit matter, court-order
-deadlines and reschedule-with-history (migration 002). Owner's priorities, in order:
-M1 find documents fast (.docx/.eml/.msg text, background ingest jobs, import folder + rescan,
-open hit at PDF page, phrase search, document metadata) -> M2 chronology + depo prep (events UI,
+deadlines and reschedule-with-history (migration 002). M1 done: .docx/.eml/.msg text with
+attachments as child documents (003), background jobs (004) for upload / import folder / rescan,
+document page with page text + "view PDF at page", phrase/OR/-word search with filters and
+title matches, editable document details. Deferred: OCR (needs Tesseract on Windows).
+Owner's priorities, in order: M2 chronology + depo prep (events UI,
 "add to chronology" from a hit, .docx export via python-docx, optional AI-proposed events) ->
 M3 discovery tracking (sets, auto-proposed response deadlines from ruleset data, limits) ->
 M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
