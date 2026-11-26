@@ -24,6 +24,13 @@ Billing, invoicing and trust accounting are deliberately out of scope.
 | Hidden Lists sheet | `CHECK` constraints | Closed vocabularies are enforced in the schema. |
 | (none) | `docket_entries`, `conflict_checks`, `ai_calls`, `settings` | ECF/AAA/JAMS docket, logged conflicts checks, every model call. |
 
+## Key Events workbook
+
+The chronology imports and exports a Key Events sheet with these columns (see `lpc/workbook.py`;
+the app can produce a blank one): Date, Approx., Event, Significance, Disputed, People, Issues,
+Source, Pin, Notes. Other header names are recognized too, so an existing workbook can be
+imported without renaming columns; the import preview shows how each column was read.
+
 ## Reconcile with your workbook
 
 This version was built from the workbook's tab names, not its column headers. When you

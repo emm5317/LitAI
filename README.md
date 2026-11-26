@@ -62,6 +62,15 @@ Turn on BitLocker (or Device Encryption) before putting real client files here.
   page and date (and any text you selected). Filter by person, issue, key or disputed; export
   what is shown to a Word table, Excel or CSV, or build a per-witness depo outline. Exports are
   saved in the matter's `20 Work Product` folder and opened in Word or Excel.
+- **Deposition transcripts**: transcript PDFs (full-size or condensed four-up) are recognized and
+  read line by line, so search hits say "Tr. 45:3", the document page shows numbered lines, and
+  selecting lines before "+ chronology" makes the pin `45:3-7`. "Read as transcript" handles
+  PDFs added earlier.
+- **Key Events workbook**: "Get a blank Key Events workbook" (Date, Approx., Event, Significance,
+  Disputed, People, Issues, Source, Pin, Notes), or import an existing .xlsx/.csv. Columns are
+  matched by name (What happened, Witnesses, Cite, Bates... also work), sources are linked to the
+  matter's documents by title, file name or Bates number, and you see a preview before anything
+  is saved.
 - **AI-suggested events** (matters with client consent only): "Suggest events (AI)" on a
   document reads it and proposes events, each with a short quote that is checked word for word
   against the page before you see it. Nothing joins the chronology until you accept it.

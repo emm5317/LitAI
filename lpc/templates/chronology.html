@@ -30,6 +30,10 @@
 </div>
 {% endif %}
 
+{% if imported is not none %}
+<p class="flash-ok">Imported {{ imported }} event{{ 's' if imported != 1 }}{% if duplicates %}; {{ duplicates }} already in the chronology were skipped{% endif %}.</p>
+{% endif %}
+
 <details class="card" id="add" {{ 'open' if adding }}>
   <summary><strong>Add an event</strong></summary>
   <form class="form" method="post" action="/matters/{{ m.id }}/events">
@@ -37,6 +41,18 @@
     {% include "partials/event_form.html" %}
     <button class="primary" type="submit">Add event</button>
   </form>
+</details>
+
+<details class="card" id="import">
+  <summary><strong>Import key events from a workbook</strong></summary>
+  <form class="inline-form" method="post" action="/matters/{{ m.id }}/chronology/import" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".xlsx,.xlsm,.csv" required>
+    <label class="check small"><input type="checkbox" name="add_people" value="1" checked> Add new names as witnesses</label>
+    <button type="submit">Preview import</button>
+  </form>
+  <p class="muted small">An Excel (.xlsx) or CSV file with a header row. Columns are recognized by name (Date, Event, People, Source, Pin...).
+    You will see what will be imported before anything is saved.
+    <button class="link" hx-post="/matters/{{ m.id }}/chronology/template" hx-swap="none">Get a blank Key Events workbook</button></p>
 </details>
 
 <div class="card">

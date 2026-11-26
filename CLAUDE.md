@@ -27,6 +27,8 @@ On Linux/macOS: `python -m pytest -q`, `python -m lpc --server-only --port 8765`
 | `lpc/jobs.py` | background jobs table + one worker thread (upload, import folder, rescan, AI suggestions) |
 | `lpc/chronology.py` | events: partial dates, people, issues, source pin; proposed (AI) vs accepted |
 | `lpc/exports.py` | chronology -> Word table / witness outline (python-docx), Excel (openpyxl), CSV |
+| `lpc/transcripts.py` | transcript PDFs -> page:line (by word position; full-size and condensed); cites |
+| `lpc/workbook.py` | Key Events workbook: blank template, header mapping, preview + import |
 | `lpc/ai/events.py` | AI-suggested events: prompt, chunking, verbatim quote check, stored as proposed |
 | `lpc/ai/gateway.py` | the ONLY path to a model (consent check, ZDR model block, audit log) |
 | `lpc/backup.py` | daily `VACUUM INTO` backup, keeps 14; started from `__main__.py` |
@@ -96,9 +98,10 @@ document page with page text + "view PDF at page", phrase/OR/-word search with f
 title matches, editable document details. Deferred: OCR (needs Tesseract on Windows).
 M2 items 1-4 done: chronology page, "+ chronology" from hits/pages, exports saved to
 `20 Work Product` and opened, AI-suggested events (migration 005; quotes verified against page
-text; `proposed` until accepted; no server-side fallbacks under ZDR). M2 still open, waiting on
-samples from the owner: Key Events workbook import (openpyxl approved) and transcript page:line
-parsing. Then ->
+text; `proposed` until accepted; no server-side fallbacks under ZDR). M2 done: transcript
+page:line (migration 006; checked on two public court-filed transcripts, condensed layout only on a
+synthetic sheet) and the Key Events workbook (own template, columns in `lpc/workbook.py`;
+import shows a preview, then saves events as accepted with origin 'import'). Then ->
 M3 discovery tracking (sets, auto-proposed response deadlines from ruleset data, limits) ->
 M4 deadlines + Outlook (.ics export, trigger sets, unverified badge) -> M5 intake polish.
 Later: ECF/NEF parser; email via **Outlook/Graph first** (the practice uses Microsoft 365),
@@ -107,7 +110,8 @@ Approved dependencies: `extract-msg`, `python-docx`, `openpyxl`.
 
 Open items to verify with the user, not guess: Illinois holiday list (205 ILCS 630/17),
 Ill. S. Ct. R. 12 mail-service days, 7th Cir. R. 10(c), FRAP 40(d)(1) subsection, N.D. Ill.
-LR 56.1 limits, Cook County entries (none yet), workbook column names vs. `docs/SCHEMA.md`.
+LR 56.1 limits, Cook County entries (none yet), a real condensed (Min-U-Script) transcript to check
+the four-up parsing against.
 
 ## Commits
 

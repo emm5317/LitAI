@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Import key events · {{ m.short_name }}{% endblock %}
+{% block content %}
+<div class="card">
+  <p class="muted small"><a href="/matters/{{ m.id }}">{{ m.short_name }}</a> · <a href="/matters/{{ m.id }}/chronology">Chronology</a></p>
+  <h2>Import {{ file_name }}{% if preview.sheet != file_name %} <span class="muted">(sheet "{{ preview.sheet }}")</span>{% endif %}</h2>
+  <p>Nothing has been saved yet. {{ importable }} row{{ 's' if importable != 1 }} will become chronology events
+    {%- if preview.skipped_examples %} ({{ preview.skipped_examples }} example row skipped){% endif %}. Rows already in the chronology (same date and text) are skipped.</p>
+
+  <h3>Columns</h3>
+  <ul class="small">
+    {% for header, key in preview.mapped.items() %}<li><strong>{{ header }}</strong> &rarr; {{ labels[key] }}</li>{% endfor %}
+    {% for header in preview.ignored %}<li class="muted"><strong>{{ header }}</strong>: not imported</li>{% endfor %}
+  </ul>
+
+  {% if unmatched_sources %}
+  <p class="warn small">{{ unmatched_sources|length }} source{{ 's' if unmatched_sources|length != 1 }} did not match a document in this matter by title, file name or Bates number; the text is kept in each event's notes: {{ unmatched_sources|join('; ') }}</p>
+  {% endif %}
+
+  <form method="post" action="/matters/{{ m.id }}/chronology/import/confirm">
+    <input type="hidden" name="token" value="{{ token }}">
+    <input type="hidden" name="file_name" value="{{ file_name }}">
+    {% if new_people %}
+    <label class="check"><input type="checkbox" name="add_people" value="1" {{ 'checked' if add_people }}>
+      Add {{ new_people|length }} {{ 'person' if new_people|length == 1 else 'people' }} not yet in this matter as witnesses: {{ new_people|join(', ') }}</label>
+    <p class="muted small">Unticked, their names go in each event's notes instead. Added people also join the conflicts registry.</p>
+    {% endif %}
+    <button class="primary" type="submit">Import {{ importable }} event{{ 's' if importable != 1 }}</button>
+    &nbsp; <a href="/matters/{{ m.id }}/chronology">Cancel</a>
+  </form>
+
+  <h3>First rows</h3>
+  <table class="chronology">
+    <thead><tr><th>Row</th><th>Date</th><th>Event</th><th>People</th><th>Source</th><th></th></tr></thead>
+    <tbody>
+    {% for r in preview.rows[:25] %}
+      <tr>
+        <td class="muted">{{ r.number }}</td>
+        <td class="nowrap">{{ r.data|event_date }}</td>
+        <td>{{ r.data.description }}{% if r.data.significance == 'key' %} <span class="tag tag-ok">key</span>{% endif %}{% if r.data.disputed %} <span class="tag tag-warn">disputed</span>{% endif %}</td>
+        <td class="small">{{ r.people|join(', ') }}</td>
+        <td class="small">{{ r.source_text }}{% if r.source_text and r.source_text in sources %} <span class="tag tag-ok">found</span>{% endif %}{% if r.data.pin %}, {{ r.data.pin }}{% endif %}</td>
+        <td class="small warn">{{ r.problems|join('; ') }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% if preview.rows|length > 25 %}<p class="muted small">and {{ preview.rows|length - 25 }} more.</p>{% endif %}
+</div>
+{% endblock %}

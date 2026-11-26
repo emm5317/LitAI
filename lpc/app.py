@@ -31,6 +31,7 @@ from .chronology import (
     parse_event_date, pin_page, reject_event, save_event,
 )
 from .config import PACKAGE_DIR, Settings, load_settings
+from .workbook import FIELD_LABELS, WorkbookError, import_rows, key_events_template, match_sources, read_workbook
 from .exports import chronology_csv, chronology_docx, chronology_xlsx, export_name, witness_outline_docx
 from .db import open_database
 from .ingest import DOC_FIELDS, _fts_query, free_path, read_as_transcript, search, search_titles, update_document
@@ -38,7 +39,7 @@ from .jobs import enqueue
 from .matters import (
     EDITABLE_FIELDS, FORUM_TYPES, MATTER_TYPES, PHASES, STATUSES, MatterError, add_party_to_matter,
     conflicts_search, create_matter, get_matter, list_matters, log_change, matter_folder, matter_parties,
-    record_conflict_check, update_matter,
+    normalize_name, record_conflict_check, update_matter,
 )
 from .transcripts import cite, is_transcript, line_for_terms, lines_on, pdf_page_for
 from .rules.engine import SERVICE_METHODS, compute, entries_for, load_rulesets
@@ -550,7 +551,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/matters/{matter_id}/chronology", response_class=HTMLResponse)
     def chronology_page(request: Request, matter_id: int, person: str = "", issue: str = "", key_only: str = "",
-                        disputed_only: str = "", doc: str = "", pin: str = "", text: str = "", date: str = ""):
+                        disputed_only: str = "", doc: str = "", pin: str = "", text: str = "", date: str = "",
+                        imported: int | None = None, duplicates: int = 0):
         """The matter's events. doc/pin/text/date prefill the add form ("Add to chronology" links)."""
         m = matter_or_404(matter_id)
         prefill = {"pin": pin, "description": text[:2000], "event_date": date}
@@ -566,6 +568,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "m": m, "events": chronology(db(), matter_id, **filters), "filters": filters,
             "proposed": chronology(db(), matter_id, status="proposed"),
             "prefill": prefill, "adding": bool(doc or pin or text or date),
+            "imported": imported, "duplicates": duplicates,
             "total": db().execute("SELECT COUNT(*) FROM events WHERE matter_id = ? AND status = 'accepted'",
                                   (matter_id,)).fetchone()[0],
             **event_form_choices(matter_id),
@@ -680,6 +683,66 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "csv": lambda: chronology_csv(events)}[format]()
         path = save_export(m, "Chronology", f".{format}", data)
         return show_notice(request, f"Saved {plural(len(events), 'event')} to", path)
+
+    @app.post("/matters/{matter_id}/chronology/template", response_class=HTMLResponse)
+    def chronology_template(request: Request, matter_id: int):
+        """A blank Key Events workbook, saved to 20 Work Product and opened."""
+        m = matter_or_404(matter_id)
+        path = save_export(m, "Key Events template", ".xlsx", key_events_template())
+        return show_notice(request, "Saved a blank Key Events workbook to", path)
+
+    def staged_import(token: str) -> Path:
+        if not re.fullmatch(r"[0-9a-f]{32}\.(xlsx|xlsm|csv)", token):
+            raise HTTPException(400, "That import has expired. Choose the file again.")
+        path = settings.data_dir / "staging" / token
+        if not path.is_file():
+            raise HTTPException(400, "That import has expired. Choose the file again.")
+        return path
+
+    @app.post("/matters/{matter_id}/chronology/import", response_class=HTMLResponse)
+    async def chronology_import_preview(request: Request, matter_id: int, file: UploadFile = File(...),
+                                        add_people: str = Form("")):
+        """Read a Key Events workbook and show what would be imported. Nothing is saved yet."""
+        m = matter_or_404(matter_id)
+        suffix = Path(PureWindowsPath(file.filename or "").name).suffix.lower()
+        if suffix not in (".xlsx", ".xlsm", ".csv"):
+            raise HTTPException(400, "Choose an Excel workbook (.xlsx) or a CSV file.")
+        token = f"{uuid.uuid4().hex}{suffix}"
+        staging = settings.data_dir / "staging"
+        staging.mkdir(parents=True, exist_ok=True)
+        with (staging / token).open("wb") as fh:
+            shutil.copyfileobj(file.file, fh)
+        try:
+            preview = read_workbook(staging / token)
+        except WorkbookError as exc:
+            (staging / token).unlink(missing_ok=True)
+            raise HTTPException(400, str(exc)) from None
+        sources = match_sources(db(), matter_id, preview.rows)
+        known = {normalize_name(p["name"]) for p in matter_parties(db(), matter_id)}
+        importing = [r for r in preview.rows if r.data["description"]]     # rows with no Event text are skipped
+        new_people = sorted({n for r in importing for n in r.people if normalize_name(n) not in known})
+        return templates.TemplateResponse(request, "chronology_import.html", {
+            "m": m, "preview": preview, "token": token, "file_name": PureWindowsPath(file.filename or "").name,
+            "labels": FIELD_LABELS, "sources": sources, "new_people": new_people, "add_people": bool(add_people),
+            "unmatched_sources": sorted({r.source_text for r in importing if r.source_text and r.source_text not in sources}),
+            "importable": len(importing),
+        })
+
+    @app.post("/matters/{matter_id}/chronology/import/confirm")
+    def chronology_import_confirm(matter_id: int, token: str = Form(...), file_name: str = Form("workbook"),
+                                  add_people: str = Form("")):
+        matter_or_404(matter_id)
+        path = staged_import(token)
+        try:
+            counts = import_rows(db(), matter_id, read_workbook(path), add_people=bool(add_people),
+                                 file_name=file_name)
+        except (WorkbookError, EventError, sqlite3.IntegrityError) as exc:
+            db().rollback()
+            raise HTTPException(400, f"Nothing was imported: {exc}") from exc
+        finally:
+            path.unlink(missing_ok=True)
+        return RedirectResponse(f"/matters/{matter_id}/chronology?imported={counts['added']}"
+                                f"&duplicates={counts['duplicates']}", status_code=303)
 
     @app.post("/matters/{matter_id}/chronology/witness", response_class=HTMLResponse)
     def export_witness_outline(request: Request, matter_id: int, witness: str = Form("")):
